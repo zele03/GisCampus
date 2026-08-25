@@ -1,1 +1,3 @@
-# Biblioteke će se dodavati postepeno, na početku svake faze projekta.
+# Povezivanje sa PostgreSQL/PostGIS bazom
+psycopg2-binary
+python-dotenv

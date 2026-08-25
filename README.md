@@ -17,9 +17,10 @@ mašinskog učenja.
 ## Trenutni status
 
 Postavljeno je lokalno Python 3.12 virtuelno okruženje i kompletna početna
-struktura projekta. Pripremljeni su prazni moduli za bazu, prostorne analize,
-mašinsko učenje, mapu i aplikaciju. Biblioteke i funkcionalnosti još nisu
-dodate i uvodiće se postepeno, kroz male Git commitove.
+struktura projekta. Ostvarena je konekcija sa PostgreSQL serverom i pripremljeno
+je automatsko kreiranje projektne baze `gis_kampus` sa PostGIS ekstenzijom i
+pet povezanih prostornih tabela sa po pet kolona za kampus Univerziteta u Novom
+Sadu. Podaci i CRUD operacije još nisu dodati.
 
 ## Lokalno pokretanje
 
@@ -36,6 +37,18 @@ python --version
 ```
 
 Očekivana verzija je Python 3.12.
+
+Instalirati trenutno potrebne biblioteke:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Proveriti konekciju i pripremiti projektnu bazu:
+
+```powershell
+python -m src.giscampus.database
+```
 
 ## Struktura
 
