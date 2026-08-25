@@ -1,0 +1,1 @@
+"""Ulazna tačka aplikacije GisCampus."""

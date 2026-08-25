@@ -8,6 +8,16 @@ __pycache__/
 # Local environment variables and secrets
 .env
 
+# Large local spatial data
+data/raw/vector/*
+!data/raw/vector/.gitkeep
+data/raw/raster/*
+!data/raw/raster/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/outputs/*
+!data/outputs/.gitkeep
+
 # Editor and operating-system files
 .vscode/
 .idea/
