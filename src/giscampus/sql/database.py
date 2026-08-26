@@ -6,7 +6,7 @@ import pandas as pd
 from psycopg2 import connect, sql
 from sqlalchemy import URL, create_engine
 
-from .config import ucitaj_podesavanja_baze
+from ..config import ucitaj_podesavanja_baze
 
 SQL_KREIRANJE_TABELA = """
 -- Prostorne zone kampusa Univerziteta u Novom Sadu.

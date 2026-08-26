@@ -24,8 +24,9 @@ povrsine, infrastrukturne objekte i sportske terene. Pripremljen je rucni unos
 pocetnih podataka SQL `INSERT` naredbama, sa najmanje pet redova u svakoj
 tabeli. Podaci iz svih sest tabela ucitavaju se u zasebne pandas DataFrame
 objekte. Obezbedjene su opste CRUD operacije za prikaz, dodavanje, azuriranje i
-brisanje redova u svih sest tabela. Povrsine i geometrije bice dopunjene u GEO
-delu projekta.
+brisanje redova u svih sest tabela. Dodato je sedam SQL upita koji povezuju dve
+ili tri tabele pomocu `JOIN` i filtriraju podatke pomocu `WHERE`. Povrsine i
+geometrije bice dopunjene u GEO delu projekta.
 
 ## Lokalno pokretanje
 
@@ -52,7 +53,7 @@ python -m pip install -r requirements.txt
 Proveriti konekciju i pripremiti projektnu bazu:
 
 ```powershell
-python -m src.giscampus.database
+python -m src.giscampus.sql.database
 ```
 
 ## Struktura
@@ -62,6 +63,10 @@ GisCampus/
 |-- app.py                         # Glavna aplikacija
 |-- requirements.txt              # Python biblioteke
 |-- src/giscampus/                 # Izvorni Python kod
+|   |-- sql/                       # Baza, CRUD i SQL upiti
+|   |-- spatial.py                 # Prostorni podaci i analize
+|   |-- ml.py                      # Masinsko ucenje
+|   `-- mapping.py                 # Prikaz podataka na mapi
 |-- data/                          # Lokalni prostorni podaci i rezultati
 |-- docs/                          # Projektna dokumentacija
 |-- notebooks/                     # Zavrsna demonstraciona sveska

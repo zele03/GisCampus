@@ -1,4 +1,4 @@
-"""CRUD operacije nad projektnim tabelama."""
+"""CRUD operacije nad projektnim SQL tabelama."""
 
 from contextlib import closing
 from typing import Any

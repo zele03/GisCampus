@@ -1,0 +1,1 @@
+"""SQL deo aplikacije GisCampus."""
