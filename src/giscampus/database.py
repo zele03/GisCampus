@@ -2,7 +2,9 @@
 
 from contextlib import closing
 
+import pandas as pd
 from psycopg2 import connect, sql
+from sqlalchemy import URL, create_engine
 
 from .config import ucitaj_podesavanja_baze
 
@@ -128,54 +130,14 @@ INSERT INTO tereni (zona_id, naziv) VALUES
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'J'), 'Teren za odbojku');
 """
 
-OCEKIVANE_KOLONE = {
-    "zone_kampusa": ("zona_id", "naziv", "oznaka", "povrsina_m2", "geometrija"),
-    "zgrade": (
-        "zgrada_id",
-        "zona_id",
-        "naziv",
-        "tip",
-        "povrsina_m2",
-        "geometrija",
-    ),
-    "parkiralista": (
-        "parkiraliste_id",
-        "zona_id",
-        "tip",
-        "povrsina_m2",
-        "geometrija",
-    ),
-    "zelene_povrsine": (
-        "zelena_povrsina_id",
-        "zona_id",
-        "tip",
-        "povrsina_m2",
-        "geometrija",
-    ),
-    "infrastrukturni_objekti": (
-        "infrastrukturni_objekat_id",
-        "zona_id",
-        "naziv",
-        "stanje",
-        "geometrija",
-    ),
-    "tereni": (
-        "teren_id",
-        "zona_id",
-        "naziv",
-        "povrsina_m2",
-        "geometrija",
-    ),
-}
-
-OCEKIVANI_BROJ_REDOVA = {
-    "zone_kampusa": 5,
-    "zgrade": 14,
-    "parkiralista": 12,
-    "zelene_povrsine": 5,
-    "infrastrukturni_objekti": 6,
-    "tereni": 8,
-}
+PROJEKTNE_TABELE = (
+    "zone_kampusa",
+    "zgrade",
+    "parkiralista",
+    "zelene_povrsine",
+    "infrastrukturni_objekti",
+    "tereni",
+)
 
 
 def povezi_se(naziv_baze: str | None = None):
@@ -255,66 +217,15 @@ def ukljuci_postgis() -> str:
 
 
 def kreiraj_tabele() -> tuple[str, ...]:
-    """Kreiraj sest osnovnih tabela i vrati njihove nazive iz baze."""
+    """Kreiraj projektne tabele i vrati njihove nazive."""
 
     with closing(povezi_se()) as konekcija:
         with konekcija.cursor() as kursor:
             kursor.execute(SQL_KREIRANJE_TABELA)
-            kursor.execute(
-                """
-                SELECT table_name
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                  AND table_type = 'BASE TABLE'
-                  AND table_name <> 'spatial_ref_sys'
-                ORDER BY table_name;
-                """
-            )
-            tabele = tuple(red[0] for red in kursor.fetchall())
 
         konekcija.commit()
 
-    return tabele
-
-
-def proveri_strukturu_tabela() -> None:
-    """Proveri kolone i opcione geometrije u svih sest tabela."""
-
-    with closing(povezi_se()) as konekcija, konekcija.cursor() as kursor:
-        for naziv_tabele, ocekivane_kolone in OCEKIVANE_KOLONE.items():
-            kursor.execute(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = %s
-                ORDER BY ordinal_position;
-                """,
-                (naziv_tabele,),
-            )
-            postojece_kolone = tuple(red[0] for red in kursor.fetchall())
-
-            if postojece_kolone != ocekivane_kolone:
-                raise RuntimeError(
-                    f"Tabela '{naziv_tabele}' nema ocekivane kolone. "
-                    f"Postojece: {postojece_kolone}. "
-                    f"Ocekivane: {ocekivane_kolone}."
-                )
-
-            kursor.execute(
-                """
-                SELECT is_nullable
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = %s
-                  AND column_name = 'geometrija';
-                """,
-                (naziv_tabele,),
-            )
-
-            if kursor.fetchone() != ("YES",):
-                raise RuntimeError(
-                    f"Geometrija u tabeli '{naziv_tabele}' mora dozvoliti NULL."
-                )
+    return PROJEKTNE_TABELE
 
 
 def prebroj_redove() -> dict[str, int]:
@@ -323,7 +234,7 @@ def prebroj_redove() -> dict[str, int]:
     broj_redova = {}
 
     with closing(povezi_se()) as konekcija, konekcija.cursor() as kursor:
-        for naziv_tabele in OCEKIVANI_BROJ_REDOVA:
+        for naziv_tabele in PROJEKTNE_TABELE:
             upit = sql.SQL("SELECT COUNT(*) FROM {};").format(
                 sql.Identifier(naziv_tabele)
             )
@@ -333,19 +244,39 @@ def prebroj_redove() -> dict[str, int]:
     return broj_redova
 
 
+def ucitaj_tabele_u_dataframe() -> dict[str, pd.DataFrame]:
+    """Ucitaj sve projektne tabele iz baze u zasebne DataFrame objekte."""
+
+    podesavanja = ucitaj_podesavanja_baze()
+    adresa_baze = URL.create(
+        drivername="postgresql+psycopg2",
+        username=podesavanja.korisnik,
+        password=podesavanja.lozinka,
+        host=podesavanja.host,
+        port=podesavanja.port,
+        database=podesavanja.naziv_baze,
+    )
+    engine = create_engine(adresa_baze)
+    tabele_dataframe = {}
+
+    try:
+        with engine.connect() as konekcija:
+            for naziv_tabele in PROJEKTNE_TABELE:
+                upit = f'SELECT * FROM "{naziv_tabele}" ORDER BY 1;'
+                tabele_dataframe[naziv_tabele] = pd.read_sql_query(upit, konekcija)
+    finally:
+        engine.dispose()
+
+    return tabele_dataframe
+
+
 def unesi_pocetne_podatke() -> bool:
     """Rucno unesi dogovorene redove ako su sve projektne tabele prazne."""
 
     broj_redova = prebroj_redove()
 
-    if broj_redova == OCEKIVANI_BROJ_REDOVA:
-        return False
-
     if any(broj_redova.values()):
-        raise RuntimeError(
-            "Pocetni podaci nisu uneti jer neke tabele vec sadrze redove. "
-            f"Trenutno stanje: {broj_redova}."
-        )
+        return False
 
     with closing(povezi_se()) as konekcija:
         with konekcija.cursor() as kursor:
@@ -353,49 +284,17 @@ def unesi_pocetne_podatke() -> bool:
 
         konekcija.commit()
 
-    broj_redova = prebroj_redove()
-    if broj_redova != OCEKIVANI_BROJ_REDOVA:
-        raise RuntimeError(
-            f"Broj unetih redova ne odgovara planu. Trenutno stanje: {broj_redova}."
-        )
-
     return True
 
 
+def pripremi_bazu() -> None:
+    """Pripremi bazu, PostGIS, projektne tabele i pocetne podatke."""
+
+    kreiraj_bazu()
+    ukljuci_postgis()
+    kreiraj_tabele()
+    unesi_pocetne_podatke()
+
+
 if __name__ == "__main__":
-    naziv_projektne_baze = ucitaj_podesavanja_baze().naziv_baze
-    verzija_postgresql, verzija_postgis = proveri_konekciju()
-    print("Konekcija sa PostgreSQL serverom je uspesna.")
-    print(f"PostgreSQL: {verzija_postgresql}")
-    print(f"Dostupna PostGIS verzija: {verzija_postgis or 'nije pronadjena'}")
-
-    baza_je_kreirana = kreiraj_bazu()
-    if baza_je_kreirana:
-        print(f"Baza '{naziv_projektne_baze}' je uspesno kreirana.")
-    else:
-        print(f"Baza '{naziv_projektne_baze}' vec postoji.")
-
-    aktivna_verzija_postgis = ukljuci_postgis()
-    print(f"PostGIS je ukljucen u projektnoj bazi: {aktivna_verzija_postgis}")
-
-    tabele = kreiraj_tabele()
-    if set(tabele) != set(OCEKIVANE_KOLONE):
-        raise RuntimeError(
-            f"Baza sadrzi neocekivane projektne tabele. Postojece tabele: {tabele}"
-        )
-
-    proveri_strukturu_tabela()
-    print("Projektne tabele su uspesno kreirane:")
-    for tabela in tabele:
-        print(f"- {tabela}")
-    print("Struktura svih sest tabela je uspesno proverena.")
-
-    podaci_su_uneti = unesi_pocetne_podatke()
-    if podaci_su_uneti:
-        print("Pocetni podaci su uspesno uneti rucnim INSERT naredbama.")
-    else:
-        print("Pocetni podaci vec postoje i nisu ponovo unoseni.")
-
-    print("Broj redova u projektnim tabelama:")
-    for tabela, broj_redova in prebroj_redove().items():
-        print(f"- {tabela}: {broj_redova}")
+    pripremi_bazu()

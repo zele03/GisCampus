@@ -22,7 +22,10 @@ je automatsko kreiranje projektne baze `gis_kampus` sa PostGIS ekstenzijom.
 Definisano je sest povezanih tabela za zone, zgrade, parkiralista, zelene
 povrsine, infrastrukturne objekte i sportske terene. Pripremljen je rucni unos
 pocetnih podataka SQL `INSERT` naredbama, sa najmanje pet redova u svakoj
-tabeli. Povrsine i geometrije bice dopunjene u GEO delu projekta.
+tabeli. Podaci iz svih sest tabela ucitavaju se u zasebne pandas DataFrame
+objekte. Obezbedjene su opste CRUD operacije za prikaz, dodavanje, azuriranje i
+brisanje redova u svih sest tabela. Povrsine i geometrije bice dopunjene u GEO
+delu projekta.
 
 ## Lokalno pokretanje
 

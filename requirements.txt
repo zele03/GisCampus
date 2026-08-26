@@ -1,3 +1,7 @@
 # Povezivanje sa PostgreSQL/PostGIS bazom
 psycopg2-binary
 python-dotenv
+
+# Ucitavanje podataka iz baze u DataFrame
+pandas
+SQLAlchemy
