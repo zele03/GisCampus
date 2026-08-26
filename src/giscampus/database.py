@@ -1,4 +1,4 @@
-"""Povezivanje sa PostGIS bazom, šema, CRUD operacije i upiti."""
+"""Povezivanje sa PostgreSQL/PostGIS bazom i njena početna priprema."""
 
 from contextlib import closing
 
@@ -8,57 +8,70 @@ from .config import ucitaj_podesavanja_baze
 
 
 SQL_KREIRANJE_TABELA = """
--- Prostorne i funkcionalne zone kampusa Univerziteta u Novom Sadu.
+-- Prostorne zone kampusa Univerziteta u Novom Sadu.
 CREATE TABLE IF NOT EXISTS zone_kampusa (
     zona_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    naziv VARCHAR(100) NOT NULL UNIQUE,
-    oznaka VARCHAR(20) NOT NULL UNIQUE,
+    naziv VARCHAR(50) NOT NULL UNIQUE,
+    oznaka VARCHAR(5) NOT NULL UNIQUE,
     povrsina_m2 NUMERIC(12, 2) CHECK (povrsina_m2 > 0),
-    geometrija geometry(Polygon, 32634) NOT NULL
+    geometrija geometry(Polygon, 32634)
 );
 
--- Zgrade koje se nalaze u određenoj zoni kampusa.
+-- Poznate zgrade koje se ručno evidentiraju u sistemu.
 CREATE TABLE IF NOT EXISTS zgrade (
     zgrada_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     zona_id INTEGER NOT NULL REFERENCES zone_kampusa(zona_id) ON DELETE RESTRICT,
     naziv VARCHAR(120) NOT NULL,
-    povrsina_m2 NUMERIC(10, 2) CHECK (povrsina_m2 > 0),
-    geometrija geometry(Polygon, 32634) NOT NULL
+    tip VARCHAR(60) NOT NULL,
+    povrsina_m2 NUMERIC(12, 2) CHECK (povrsina_m2 > 0),
+    geometrija geometry(Polygon, 32634)
 );
 
--- Parkovi, travnjaci i druge zelene površine u zonama kampusa.
+-- Parking površine koje se posmatraju kao celine.
+CREATE TABLE IF NOT EXISTS parkiralista (
+    parkiraliste_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    zona_id INTEGER NOT NULL REFERENCES zone_kampusa(zona_id) ON DELETE RESTRICT,
+    tip VARCHAR(20) NOT NULL CHECK (tip IN ('javno', 'privatno')),
+    povrsina_m2 NUMERIC(12, 2) CHECK (povrsina_m2 > 0),
+    geometrija geometry(Polygon, 32634)
+);
+
+-- Parkovi, livade, travnjaci i druge zelene površine.
 CREATE TABLE IF NOT EXISTS zelene_povrsine (
     zelena_povrsina_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     zona_id INTEGER NOT NULL REFERENCES zone_kampusa(zona_id) ON DELETE RESTRICT,
     tip VARCHAR(60) NOT NULL,
-    povrsina_m2 NUMERIC(10, 2) CHECK (povrsina_m2 > 0),
-    geometrija geometry(Polygon, 32634) NOT NULL
+    povrsina_m2 NUMERIC(12, 2) CHECK (povrsina_m2 > 0),
+    geometrija geometry(Polygon, 32634)
 );
 
--- Putevi, biciklističke staze i pešačke staze u kampusu.
-CREATE TABLE IF NOT EXISTS putevi (
-    put_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+-- Odabrani infrastrukturni objekti predstavljeni tačkama.
+CREATE TABLE IF NOT EXISTS infrastrukturni_objekti (
+    infrastrukturni_objekat_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     zona_id INTEGER NOT NULL REFERENCES zone_kampusa(zona_id) ON DELETE RESTRICT,
-    tip VARCHAR(60) NOT NULL,
-    duzina_m NUMERIC(10, 2) CHECK (duzina_m > 0),
-    geometrija geometry(LineString, 32634) NOT NULL
-);
-
--- Sportski tereni, uključujući terene na Đačkom igralištu.
-CREATE TABLE IF NOT EXISTS tereni (
-    teren_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    zona_id INTEGER NOT NULL REFERENCES zone_kampusa(zona_id) ON DELETE RESTRICT,
-    podloga VARCHAR(60) NOT NULL,
-    povrsina_m2 NUMERIC(10, 2) CHECK (povrsina_m2 > 0),
-    geometrija geometry(Polygon, 32634) NOT NULL
+    naziv VARCHAR(120) NOT NULL,
+    stanje VARCHAR(30) NOT NULL,
+    geometrija geometry(Point, 32634)
 );
 """
 
 OCEKIVANE_KOLONE = {
     "zone_kampusa": ("zona_id", "naziv", "oznaka", "povrsina_m2", "geometrija"),
-    "zgrade": ("zgrada_id", "zona_id", "naziv", "povrsina_m2", "geometrija"),
-    "putevi": ("put_id", "zona_id", "tip", "duzina_m", "geometrija"),
-    "tereni": ("teren_id", "zona_id", "podloga", "povrsina_m2", "geometrija"),
+    "zgrade": (
+        "zgrada_id",
+        "zona_id",
+        "naziv",
+        "tip",
+        "povrsina_m2",
+        "geometrija",
+    ),
+    "parkiralista": (
+        "parkiraliste_id",
+        "zona_id",
+        "tip",
+        "povrsina_m2",
+        "geometrija",
+    ),
     "zelene_povrsine": (
         "zelena_povrsina_id",
         "zona_id",
@@ -66,7 +79,15 @@ OCEKIVANE_KOLONE = {
         "povrsina_m2",
         "geometrija",
     ),
+    "infrastrukturni_objekti": (
+        "infrastrukturni_objekat_id",
+        "zona_id",
+        "naziv",
+        "stanje",
+        "geometrija",
+    ),
 }
+
 
 def povezi_se(naziv_baze: str | None = None):
     """Otvori konekciju ka zadatoj ili projektnoj PostgreSQL bazi."""
@@ -145,7 +166,7 @@ def ukljuci_postgis() -> str:
 
 
 def kreiraj_tabele() -> tuple[str, ...]:
-    """Kreiraj početne projektne tabele i vrati postojeće korisničke tabele."""
+    """Kreiraj pet osnovnih tabela i vrati njihove nazive iz baze."""
 
     with closing(povezi_se()) as konekcija:
         with konekcija.cursor() as kursor:
@@ -168,7 +189,7 @@ def kreiraj_tabele() -> tuple[str, ...]:
 
 
 def proveri_strukturu_tabela() -> None:
-    """Proveri da li tabele u bazi imaju očekivane kolone i njihov redosled."""
+    """Proveri kolone i opcione geometrije u svih pet tabela."""
 
     with closing(povezi_se()) as konekcija, konekcija.cursor() as kursor:
         for naziv_tabele, ocekivane_kolone in OCEKIVANE_KOLONE.items():
@@ -185,9 +206,25 @@ def proveri_strukturu_tabela() -> None:
 
             if postojece_kolone != ocekivane_kolone:
                 raise RuntimeError(
-                    f"Tabela '{naziv_tabele}' nema očekivanu strukturu. "
-                    f"Postojeće kolone: {postojece_kolone}. "
-                    f"Očekivane kolone: {ocekivane_kolone}."
+                    f"Tabela '{naziv_tabele}' nema očekivane kolone. "
+                    f"Postojeće: {postojece_kolone}. "
+                    f"Očekivane: {ocekivane_kolone}."
+                )
+
+            kursor.execute(
+                """
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = %s
+                  AND column_name = 'geometrija';
+                """,
+                (naziv_tabele,),
+            )
+
+            if kursor.fetchone() != ("YES",):
+                raise RuntimeError(
+                    f"Geometrija u tabeli '{naziv_tabele}' mora dozvoliti NULL."
                 )
 
 
@@ -208,8 +245,14 @@ if __name__ == "__main__":
     print(f"PostGIS je uključen u projektnoj bazi: {aktivna_verzija_postgis}")
 
     tabele = kreiraj_tabele()
+    if set(tabele) != set(OCEKIVANE_KOLONE):
+        raise RuntimeError(
+            "Baza sadrži neočekivane projektne tabele. "
+            f"Postojeće tabele: {tabele}"
+        )
+
     proveri_strukturu_tabela()
-    print("Projektne tabele su spremne:")
+    print("Projektne tabele su uspešno kreirane:")
     for tabela in tabele:
         print(f"- {tabela}")
-    print("Svaka projektna tabela ima očekivanih pet kolona.")
+    print("Struktura svih pet tabela je uspešno proverena.")
