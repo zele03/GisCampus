@@ -1,4 +1,4 @@
-"""Učitavanje lokalnih podešavanja projekta."""
+"""Ucitavanje lokalnih podesavanja projekta."""
 
 import os
 from dataclasses import dataclass
@@ -18,7 +18,7 @@ class PodesavanjaBaze:
 
 
 def ucitaj_podesavanja_baze() -> PodesavanjaBaze:
-    """Učitaj i proveri parametre baze iz lokalnog .env fajla."""
+    """Ucitaj i proveri parametre baze iz lokalnog .env fajla."""
 
     load_dotenv()
 

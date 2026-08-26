@@ -3,29 +3,30 @@
 Studentski projekat iz predmeta **Osnove geoinformatike**.
 
 GisCampus je GIS aplikacija za upravljanje infrastrukturom univerzitetskog
-kampusa. Projekat će objediniti PostgreSQL/PostGIS bazu, obradu prostornih
-podataka u Pythonu i automatsko izdvajanje zgrada sa ortofoto snimaka pomoću
-mašinskog učenja.
+kampusa. Projekat ce objediniti PostgreSQL/PostGIS bazu, obradu prostornih
+podataka u Pythonu i automatsko izdvajanje zgrada sa ortofoto snimaka pomocu
+masinskog ucenja.
 
 ## Planirane celine
 
 1. PostgreSQL/PostGIS baza i CRUD operacije iz Pythona
-2. Učitavanje, povezivanje i analiza vektorskih i rasterskih podataka
-3. ML izdvajanje zgrada i čuvanje rezultata u PostGIS bazi
+2. Ucitavanje, povezivanje i analiza vektorskih i rasterskih podataka
+3. ML izdvajanje zgrada i cuvanje rezultata u PostGIS bazi
 4. Interaktivni GIS interfejs
 
 ## Trenutni status
 
-Postavljeno je lokalno Python 3.12 virtuelno okruženje i kompletna početna
+Postavljeno je lokalno Python 3.12 virtuelno okruzenje i kompletna pocetna
 struktura projekta. Ostvarena je konekcija sa PostgreSQL serverom i pripremljeno
 je automatsko kreiranje projektne baze `gis_kampus` sa PostGIS ekstenzijom.
-Definisano je pet povezanih tabela za zone, zgrade, parkirališta, zelene
-površine i infrastrukturne objekte. Početni podaci i ostale funkcionalnosti još
-nisu dodati.
+Definisano je sest povezanih tabela za zone, zgrade, parkiralista, zelene
+povrsine, infrastrukturne objekte i sportske terene. Pripremljen je rucni unos
+pocetnih podataka SQL `INSERT` naredbama, sa najmanje pet redova u svakoj
+tabeli. Povrsine i geometrije bice dopunjene u GEO delu projekta.
 
 ## Lokalno pokretanje
 
-U PowerShell terminalu aktivirati virtuelno okruženje:
+U PowerShell terminalu aktivirati virtuelno okruzenje:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -37,7 +38,7 @@ Proveriti aktivnu verziju Pythona:
 python --version
 ```
 
-Očekivana verzija je Python 3.12.
+Ocekivana verzija je Python 3.12.
 
 Instalirati trenutno potrebne biblioteke:
 
@@ -60,7 +61,7 @@ GisCampus/
 |-- src/giscampus/                 # Izvorni Python kod
 |-- data/                          # Lokalni prostorni podaci i rezultati
 |-- docs/                          # Projektna dokumentacija
-|-- notebooks/                     # Završna demonstraciona sveska
+|-- notebooks/                     # Zavrsna demonstraciona sveska
 |-- tests/                         # Automatske provere
 |-- .gitignore
 `-- README.md

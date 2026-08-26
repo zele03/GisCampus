@@ -1,1 +1,1 @@
-"""Postupak mašinskog učenja za izdvajanje zgrada sa snimaka."""
+"""Postupak masinskog ucenja za izdvajanje zgrada sa snimaka."""
