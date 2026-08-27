@@ -55,6 +55,19 @@ OSM_POLIGONI_ZGRADA = {
     "Institut BioSens": [1098557258],
 }
 
+# Veza izmedju naziva terena u SQL tabeli i poligona iz OSM SHP sloja.
+# ID vrednosti su rucno proverene na interaktivnoj mapi.
+OSM_POLIGONI_TERENA = {
+    "Teren za fudbal": 222834316,
+    "Teren za mali fudbal 1": 222834322,
+    "Teren za kosarku 1": 222834323,
+    "Teren za mali fudbal 2": 222834324,
+    "Teren za kosarku 2": 222834325,
+    "Teren za odbojku": 222834326,
+    "Teren za tenis": 222834327,
+    "Teren za mali fudbal 3": 222834329,
+}
+
 BOJE_ZGRADA = [
     "#e41a1c",
     "#377eb8",
@@ -103,6 +116,32 @@ def pripremi_predloge_zgrada() -> gpd.GeoDataFrame:
         )
 
     return gpd.GeoDataFrame(redovi, geometry="geometrija", crs=osm_zgrade.crs)
+
+
+def pripremi_predloge_terena() -> gpd.GeoDataFrame:
+    """Povezi nazive terena iz SQL tabele sa rucno proverenim OSM poligonima."""
+
+    osm_poligoni = ucitaj_shp_sloj("poligonski_objekti")
+    osm_id_brojevi = osm_poligoni["osm_id"].astype(int)
+    redovi = []
+
+    for naziv, osm_id in OSM_POLIGONI_TERENA.items():
+        pronadjeni = osm_poligoni[osm_id_brojevi == osm_id]
+        if len(pronadjeni) != 1:
+            raise RuntimeError(
+                f"Za teren '{naziv}' ocekuje se jedan OSM poligon sa ID {osm_id}, "
+                f"a pronadjeno je: {len(pronadjeni)}."
+            )
+
+        redovi.append(
+            {
+                "naziv": naziv,
+                "osm_id": osm_id,
+                "geometrija": pronadjeni.geometry.iloc[0],
+            }
+        )
+
+    return gpd.GeoDataFrame(redovi, geometry="geometrija", crs=osm_poligoni.crs)
 
 
 def _dodaj_raster(mapa: folium.Map, putanja_rastera: Path) -> None:

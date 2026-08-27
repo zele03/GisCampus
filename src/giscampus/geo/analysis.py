@@ -6,14 +6,31 @@ import geopandas as gpd
 from psycopg2 import Binary
 from shapely.ops import polygonize, unary_union
 
-from .data import KOREN_PROJEKTA
 from ..sql.database import povezi_se
+from .data import KOREN_PROJEKTA
 
 PUTANJA_NACRTANIH_ZONA = (
     KOREN_PROJEKTA / "data" / "processed" / "campus" / "zone_nacrtane.geojson"
 )
 PUTANJA_ZONA = (
     KOREN_PROJEKTA / "data" / "processed" / "campus" / "zone.geojson"
+)
+PUTANJA_PARKIRALISTA = (
+    KOREN_PROJEKTA / "data" / "processed" / "campus" / "parkiralista.geojson"
+)
+PUTANJA_ZELENIH_POVRSINA = (
+    KOREN_PROJEKTA
+    / "data"
+    / "processed"
+    / "campus"
+    / "zelene_povrsine.geojson"
+)
+PUTANJA_INFRASTRUKTURNIH_OBJEKATA = (
+    KOREN_PROJEKTA
+    / "data"
+    / "processed"
+    / "campus"
+    / "infrastrukturni_objekti.geojson"
 )
 
 
@@ -138,6 +155,174 @@ def upisi_zgrade_u_postgis() -> int:
         if broj_azuriranih != 14:
             raise RuntimeError(
                 f"Ocekivano je 14 azuriranih zgrada, a dobijeno {broj_azuriranih}."
+            )
+
+    return broj_azuriranih
+
+
+def upisi_parkiralista_u_postgis(
+    putanja: Path = PUTANJA_PARKIRALISTA,
+) -> int:
+    """Povezi nacrtane poligone sa SQL parkiralistima i upisi ih u bazu."""
+
+    parkiralista = gpd.read_file(putanja).to_crs(32634)
+    ocekivani_id = set(range(1, 13))
+
+    if set(parkiralista["parkiraliste_id"].astype(int)) != ocekivani_id:
+        raise ValueError("GeoJSON mora sadrzati parkiraliste_id vrednosti od 1 do 12.")
+    if not parkiralista.geometry.is_valid.all():
+        raise ValueError("Sve geometrije parkiralista moraju biti ispravne.")
+
+    broj_azuriranih = 0
+    with povezi_se() as konekcija, konekcija.cursor() as kursor:
+        for _, parkiraliste in parkiralista.iterrows():
+            kursor.execute(
+                """
+                UPDATE parkiralista
+                SET povrsina_m2 = %s,
+                    geometrija = ST_GeomFromWKB(%s, 32634)
+                WHERE parkiraliste_id = %s AND naziv = %s;
+                """,
+                (
+                    round(parkiraliste.geometry.area, 2),
+                    Binary(parkiraliste.geometry.wkb),
+                    int(parkiraliste["parkiraliste_id"]),
+                    parkiraliste["naziv"],
+                ),
+            )
+            broj_azuriranih += kursor.rowcount
+
+        if broj_azuriranih != 12:
+            raise RuntimeError(
+                "Ocekivano je 12 azuriranih parkiralista, "
+                f"a dobijeno {broj_azuriranih}."
+            )
+
+    return broj_azuriranih
+
+
+def upisi_zelene_povrsine_u_postgis(
+    putanja: Path = PUTANJA_ZELENIH_POVRSINA,
+) -> int:
+    """Povezi nacrtane zelene povrsine sa SQL redovima i upisi ih u bazu."""
+
+    zelene_povrsine = gpd.read_file(putanja).to_crs(32634)
+    ocekivani_id = set(range(1, 6))
+
+    if set(zelene_povrsine["zelena_povrsina_id"].astype(int)) != ocekivani_id:
+        raise ValueError(
+            "GeoJSON mora sadrzati zelena_povrsina_id vrednosti od 1 do 5."
+        )
+    if not zelene_povrsine.geometry.is_valid.all():
+        raise ValueError("Sve geometrije zelenih povrsina moraju biti ispravne.")
+
+    broj_azuriranih = 0
+    with povezi_se() as konekcija, konekcija.cursor() as kursor:
+        for _, povrsina in zelene_povrsine.iterrows():
+            kursor.execute(
+                """
+                UPDATE zelene_povrsine
+                SET povrsina_m2 = %s,
+                    geometrija = ST_GeomFromWKB(%s, 32634)
+                WHERE zelena_povrsina_id = %s AND tip = %s;
+                """,
+                (
+                    round(povrsina.geometry.area, 2),
+                    Binary(povrsina.geometry.wkb),
+                    int(povrsina["zelena_povrsina_id"]),
+                    povrsina["tip"],
+                ),
+            )
+            broj_azuriranih += kursor.rowcount
+
+        if broj_azuriranih != 5:
+            raise RuntimeError(
+                "Ocekivano je pet azuriranih zelenih povrsina, "
+                f"a dobijeno {broj_azuriranih}."
+            )
+
+    return broj_azuriranih
+
+
+def upisi_infrastrukturne_objekte_u_postgis(
+    putanja: Path = PUTANJA_INFRASTRUKTURNIH_OBJEKATA,
+) -> int:
+    """Povezi nacrtane tacke sa SQL infrastrukturnim objektima."""
+
+    objekti = gpd.read_file(putanja).to_crs(32634)
+    ocekivani_id = set(range(1, 7))
+
+    if set(objekti["infrastrukturni_objekat_id"].astype(int)) != ocekivani_id:
+        raise ValueError(
+            "GeoJSON mora sadrzati infrastrukturni_objekat_id vrednosti od 1 do 6."
+        )
+    if not objekti.geometry.is_valid.all():
+        raise ValueError("Sve tacke infrastrukturnih objekata moraju biti ispravne.")
+    if not (objekti.geometry.geom_type == "Point").all():
+        raise ValueError("Sve geometrije infrastrukturnih objekata moraju biti tacke.")
+
+    broj_azuriranih = 0
+    with povezi_se() as konekcija, konekcija.cursor() as kursor:
+        for _, objekat in objekti.iterrows():
+            kursor.execute(
+                """
+                UPDATE infrastrukturni_objekti
+                SET geometrija = ST_GeomFromWKB(%s, 32634)
+                WHERE infrastrukturni_objekat_id = %s AND naziv = %s;
+                """,
+                (
+                    Binary(objekat.geometry.wkb),
+                    int(objekat["infrastrukturni_objekat_id"]),
+                    objekat["naziv"],
+                ),
+            )
+            broj_azuriranih += kursor.rowcount
+
+        if broj_azuriranih != 6:
+            raise RuntimeError(
+                "Ocekivano je sest azuriranih infrastrukturnih objekata, "
+                f"a dobijeno {broj_azuriranih}."
+            )
+
+    return broj_azuriranih
+
+
+def upisi_terene_u_postgis() -> int:
+    """Povezi OSM poligone sa SQL terenima i upisi geometrije i povrsine."""
+
+    # Uvoz je unutar funkcije iz istog razloga kao kod obrade zgrada.
+    from .map import pripremi_predloge_terena
+
+    tereni = pripremi_predloge_terena().to_crs(32634)
+    if len(tereni) != 8:
+        raise ValueError("Ocekivano je tacno osam pripremljenih terena.")
+    if not tereni.geometry.is_valid.all():
+        raise ValueError("Sve geometrije terena moraju biti ispravne.")
+    if not (tereni.geometry.geom_type == "Polygon").all():
+        raise ValueError("Sve geometrije terena moraju biti poligoni.")
+
+    broj_azuriranih = 0
+    with povezi_se() as konekcija, konekcija.cursor() as kursor:
+        for _, teren in tereni.iterrows():
+            kursor.execute(
+                """
+                UPDATE tereni
+                SET povrsina_m2 = %s,
+                    geometrija = ST_GeomFromWKB(%s, 32634)
+                WHERE naziv = %s;
+                """,
+                (
+                    round(teren["geometrija"].area, 2),
+                    Binary(teren["geometrija"].wkb),
+                    teren["naziv"],
+                ),
+            )
+            broj_azuriranih += kursor.rowcount
+
+        if broj_azuriranih != 8:
+            raise RuntimeError(
+                "Ocekivano je osam azuriranih terena, "
+                f"a dobijeno {broj_azuriranih}."
             )
 
     return broj_azuriranih

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS zgrade (
 CREATE TABLE IF NOT EXISTS parkiralista (
     parkiraliste_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     zona_id INTEGER NOT NULL REFERENCES zone_kampusa(zona_id) ON DELETE RESTRICT,
+    naziv VARCHAR(50) NOT NULL UNIQUE,
     tip VARCHAR(20) NOT NULL CHECK (tip IN ('javno', 'privatno')),
     povrsina_m2 NUMERIC(12, 2) CHECK (povrsina_m2 > 0),
     geometrija geometry(Polygon, 32634)
@@ -90,32 +91,32 @@ INSERT INTO zgrade (zona_id, naziv, tip) VALUES
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'Rektorat', 'rektorat'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'J'), 'Institut BioSens', 'institut');
 
-INSERT INTO parkiralista (zona_id, tip) VALUES
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'javno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'privatno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'privatno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'javno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'privatno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'C'), 'javno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'C'), 'privatno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'javno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'javno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'privatno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'privatno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'J'), 'javno');
+INSERT INTO parkiralista (zona_id, naziv, tip) VALUES
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'parkiraliste_1', 'javno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'parkiraliste_2', 'privatno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'parkiraliste_3', 'privatno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'parkiraliste_4', 'javno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'parkiraliste_5', 'privatno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'C'), 'parkiraliste_6', 'javno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'C'), 'parkiraliste_7', 'privatno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'parkiraliste_8', 'javno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'parkiraliste_9', 'javno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'parkiraliste_10', 'privatno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'parkiraliste_11', 'privatno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'J'), 'parkiraliste_12', 'javno');
 
 INSERT INTO zelene_povrsine (zona_id, tip) VALUES
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'park'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'park'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'livada'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'dvoriste 1'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'dvoriste 2'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'dvoriste 3');
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'dvoriste 1'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'dvoriste 2'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'dvoriste 3');
 
 INSERT INTO infrastrukturni_objekti (zona_id, naziv, stanje) VALUES
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'Trafostanica 1', 'dobro'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'Trafostanica 2', 'dobro'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'Fontana', 'neispravno'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'Parkiraliste za bicikle', 'dobro'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Trafostanica 1', 'dobro'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Trafostanica 2', 'dobro'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Fontana', 'neispravno'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Parkiraliste za bicikle', 'dobro'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'C'), 'Parkiraliste za bicikle', 'dobro'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'S'), 'Kontejner', 'dobro');
 

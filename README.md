@@ -52,6 +52,28 @@ Ocisceni poligoni su povezani sa pet postojecih redova tabele `zone_kampusa` i
 upisani u PostGIS u EPSG:32634, zajedno sa izracunatim povrsinama.
 Strani kljucevi zgrada provereni su u odnosu na nacrtane zone; FTN ostaje u
 Centralnoj, a Ekonomski fakultet pripada Zapadnoj zoni.
+Tabela `parkiralista` dopunjena je jedinstvenom kolonom `naziv`, sa vrednostima
+od `parkiraliste_1` do `parkiraliste_12`, radi jednostavnog povezivanja sa
+rucno nacrtanim poligonima. Interaktivni ekran sada omogucava izbor jednog od
+12 redova iz baze i cuvanje nacrtanog poligona u
+`data/processed/campus/parkiralista.geojson`. Svih 12 poligona povezano je sa
+tabelom `parkiralista` preko `parkiraliste_id` i naziva, a geometrije i
+izracunate povrsine upisane su u PostGIS u EPSG:32634.
+Interaktivni ekran je zatim prilagodjen za crtanje pet redova iz tabele
+`zelene_povrsine`. Kao opcioni referentni sloj prikazuju se objekti klasa
+`park`, `grass` i `forest` iz vec preuzetog SHP sloja namene zemljista, dok se
+rucni crtezi cuvaju u `data/processed/campus/zelene_povrsine.geojson`. Svih pet
+poligona povezano je sa tabelom `zelene_povrsine` preko primarnog kljuca i tipa,
+a geometrije i izracunate povrsine upisane su u PostGIS u EPSG:32634.
+Interaktivna aplikacija vise ne prepisuje prethodni ekran: izbor prikaza cuva
+zajednicki pregled, crtanje parkiralista, zelenih povrsina i infrastrukturnih
+objekata. Infrastrukturni objekti se rucno evidentiraju kao tacke i privremeno
+cuvaju u `data/processed/campus/infrastrukturni_objekti.geojson`. Svih sest
+tacaka povezano je sa tabelom `infrastrukturni_objekti` preko primarnog kljuca i
+naziva, a geometrije su upisane u PostGIS u EPSG:32634.
+U aplikaciju je dodat prikaz `Tereni` sa osam `pitch` poligona iz Geofabrik SHP
+sloja. Svaki poligon ima vidljivu `osm_id` oznaku i povrsinu, kako bi se rucno
+upario sa odgovarajucim nazivom terena iz SQL tabele pre upisa u PostGIS.
 
 ## Lokalno pokretanje
 
@@ -94,6 +116,9 @@ Pokrenuti interaktivnu aplikaciju za crtanje zona:
 ```powershell
 python -m streamlit run app.py
 ```
+
+Svih osam sportskih terena povezano je sa rucno proverenim OSM poligonima,
+a njihove povrsine i geometrije upisane su u PostGIS.
 
 ## Struktura
 

@@ -19,7 +19,7 @@ KONFIGURACIJA_TABELA = {
     },
     "parkiralista": {
         "primarni_kljuc": "parkiraliste_id",
-        "kolone": {"zona_id", "tip", "povrsina_m2", "geometrija"},
+        "kolone": {"zona_id", "naziv", "tip", "povrsina_m2", "geometrija"},
     },
     "zelene_povrsine": {
         "primarni_kljuc": "zelena_povrsina_id",
