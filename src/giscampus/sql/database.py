@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS zgrade (
     naziv VARCHAR(120) NOT NULL,
     tip VARCHAR(60) NOT NULL,
     povrsina_m2 NUMERIC(12, 2) CHECK (povrsina_m2 > 0),
-    geometrija geometry(Polygon, 32634)
+    geometrija geometry(MultiPolygon, 32634)
 );
 
 -- Parking povrsine koje se posmatraju kao celine.
@@ -81,11 +81,11 @@ INSERT INTO zgrade (zona_id, naziv, tip) VALUES
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'C'), 'Filozofski fakultet', 'fakultet'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'C'), 'Fakultet tehnickih nauka', 'fakultet'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'J'), 'Prirodno-matematicki fakultet', 'fakultet'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'Ekonomski fakultet', 'fakultet'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Ekonomski fakultet', 'fakultet'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'J'), 'Visoka poslovna skola', 'visoka skola'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Naucno-tehnoloski park', 'naucno-tehnoloski park'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Studentski dom A', 'studentski dom'),
-    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Studentski dom B', 'studentski dom'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Studentski dom Slobodan Bajic', 'studentski dom'),
+    ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Studentski dom Veljko Vlahovic', 'studentski dom'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'Z'), 'Veseli vrtic', 'vrtic'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'I'), 'Rektorat', 'rektorat'),
     ((SELECT zona_id FROM zone_kampusa WHERE oznaka = 'J'), 'Institut BioSens', 'institut');

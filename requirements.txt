@@ -5,3 +5,12 @@ python-dotenv
 # Ucitavanje podataka iz baze u DataFrame
 pandas
 SQLAlchemy
+
+# Ucitavanje i obrada SHP prostornih podataka
+geopandas
+rasterio
+
+# Interaktivni prikaz prostornih slojeva
+folium
+streamlit
+streamlit-folium

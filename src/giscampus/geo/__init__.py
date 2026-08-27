@@ -1,0 +1,1 @@
+"""GEO deo aplikacije GisCampus."""
