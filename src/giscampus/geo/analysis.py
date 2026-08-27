@@ -1,6 +1,7 @@
 """Overlay tehnike i prostorni upiti nad geoprostornim podacima."""
 
 from pathlib import Path
+from warnings import catch_warnings, simplefilter
 
 import geopandas as gpd
 from psycopg2 import Binary
@@ -326,3 +327,145 @@ def upisi_terene_u_postgis() -> int:
             )
 
     return broj_azuriranih
+
+
+UPITI_SLOJEVA_ZA_ANALIZE = {
+    "zone": """
+        SELECT zona_id, naziv, geometrija
+        FROM zone_kampusa WHERE geometrija IS NOT NULL;
+    """,
+    "zgrade": """
+        SELECT zgrada_id, zona_id, naziv, geometrija
+        FROM zgrade WHERE geometrija IS NOT NULL;
+    """,
+    "parkiralista": """
+        SELECT parkiraliste_id, zona_id, naziv, geometrija
+        FROM parkiralista WHERE geometrija IS NOT NULL;
+    """,
+    "zelene_povrsine": """
+        SELECT zelena_povrsina_id, zona_id, tip, geometrija
+        FROM zelene_povrsine WHERE geometrija IS NOT NULL;
+    """,
+    "infrastrukturni_objekti": """
+        SELECT infrastrukturni_objekat_id, zona_id, naziv, geometrija
+        FROM infrastrukturni_objekti WHERE geometrija IS NOT NULL;
+    """,
+}
+
+
+def ucitaj_sloj_za_analizu(naziv_sloja: str) -> gpd.GeoDataFrame:
+    """Ucitaj jedan projektni sloj iz PostGIS baze u EPSG:32634."""
+
+    if naziv_sloja not in UPITI_SLOJEVA_ZA_ANALIZE:
+        raise ValueError(f"Sloj '{naziv_sloja}' nije podrzan za analize.")
+
+    with povezi_se() as konekcija, catch_warnings():
+        simplefilter("ignore", UserWarning)
+        sloj = gpd.read_postgis(
+            UPITI_SLOJEVA_ZA_ANALIZE[naziv_sloja],
+            konekcija,
+            geom_col="geometrija",
+            crs="EPSG:32634",
+        )
+
+    return sloj.rename_geometry("geometry")
+
+
+def analiza_clip_zgrada() -> gpd.GeoDataFrame:
+    """CLIP: odseci zgrade granicom Severne zone kampusa."""
+
+    zone = ucitaj_sloj_za_analizu("zone")
+    zgrade = ucitaj_sloj_za_analizu("zgrade")
+    severna_zona = zone[zone["naziv"] == "Severna"][["geometry"]]
+    if len(severna_zona) != 1:
+        raise RuntimeError("U bazi mora postojati tacno jedna Severna zona.")
+
+    rezultat = gpd.clip(zgrade, severna_zona)
+    rezultat["analiza"] = "Zgrada unutar Severne zone"
+    return rezultat
+
+
+def analiza_preseka_parkinga_i_zelenila() -> gpd.GeoDataFrame:
+    """INTERSECTION: izdvoji preseke parkiralista i zelenih povrsina."""
+
+    parkiralista = ucitaj_sloj_za_analizu("parkiralista")
+    zelenilo = ucitaj_sloj_za_analizu("zelene_povrsine")
+    rezultat = gpd.overlay(
+        parkiralista[["parkiraliste_id", "naziv", "geometry"]],
+        zelenilo[["zelena_povrsina_id", "tip", "geometry"]],
+        how="intersection",
+        keep_geom_type=False,
+    )
+    rezultat["analiza"] = "Presek parkiralista i zelene povrsine"
+    return rezultat
+
+
+def analiza_unije_parkinga_i_zelenila() -> gpd.GeoDataFrame:
+    """UNION: kombinuj parkiralista i zelene povrsine."""
+
+    parkiralista = ucitaj_sloj_za_analizu("parkiralista")
+    zelenilo = ucitaj_sloj_za_analizu("zelene_povrsine")
+    rezultat = gpd.overlay(
+        parkiralista[["parkiraliste_id", "naziv", "geometry"]],
+        zelenilo[["zelena_povrsina_id", "tip", "geometry"]],
+        how="union",
+        keep_geom_type=False,
+    )
+    rezultat["analiza"] = "Unija parkiralista i zelenih povrsina"
+    return rezultat
+
+
+def analiza_slobodne_povrsine_kampusa() -> gpd.GeoDataFrame:
+    """DIFFERENCE: oduzmi zgrade od ukupne povrsine kampusa."""
+
+    zone = ucitaj_sloj_za_analizu("zone")
+    zgrade = ucitaj_sloj_za_analizu("zgrade")
+    kampus = zone[["geometry"]].dissolve().assign(naziv="Slobodna povrsina kampusa")
+    zauzeto = zgrade[["geometry"]].dissolve()
+    rezultat = gpd.overlay(kampus, zauzeto, how="difference")
+    rezultat["povrsina_m2"] = rezultat.geometry.area.round(2)
+    rezultat["analiza"] = "Povrsina kampusa bez zgrada"
+    return rezultat
+
+
+def analiza_buffera_infrastrukture() -> gpd.GeoDataFrame:
+    """BUFFER: napravi zonu od 30 metara oko infrastrukturnih objekata."""
+
+    objekti = ucitaj_sloj_za_analizu("infrastrukturni_objekti")
+    rezultat = objekti.copy()
+    rezultat.geometry = rezultat.geometry.buffer(30)
+    rezultat["udaljenost_m"] = 30
+    rezultat["analiza"] = "Buffer 30 m oko infrastrukturnog objekta"
+    return rezultat
+
+
+def analiza_infrastrukture_u_centralnoj_zoni() -> gpd.GeoDataFrame:
+    """WITHIN: izdvoji infrastrukturu koja se nalazi u Centralnoj zoni."""
+
+    zone = ucitaj_sloj_za_analizu("zone")
+    centralna_zona = zone[zone["naziv"] == "Centralna"]
+    if len(centralna_zona) != 1:
+        raise RuntimeError("U bazi mora postojati tacno jedna Centralna zona.")
+
+    objekti = ucitaj_sloj_za_analizu("infrastrukturni_objekti")
+    geometrija_zone = centralna_zona.geometry.iloc[0]
+    rezultat = objekti[objekti.geometry.within(geometrija_zone)].copy()
+    rezultat["analiza"] = "Infrastrukturni objekat je u Centralnoj zoni"
+    return rezultat
+
+
+def analiza_preklapanja_parkinga_i_zgrada() -> gpd.GeoDataFrame:
+    """OVERLAPS: pronadji parkiralista koja se preklapaju sa zgradama."""
+
+    parkiralista = ucitaj_sloj_za_analizu("parkiralista")
+    zgrade = ucitaj_sloj_za_analizu("zgrade")
+    rezultat = gpd.sjoin(
+        parkiralista,
+        zgrade[["zgrada_id", "naziv", "geometry"]],
+        how="inner",
+        predicate="overlaps",
+        lsuffix="parking",
+        rsuffix="zgrada",
+    )
+    rezultat["analiza"] = "Parking se preklapa sa zgradom"
+    return rezultat

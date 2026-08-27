@@ -65,15 +65,12 @@ Interaktivni ekran je zatim prilagodjen za crtanje pet redova iz tabele
 rucni crtezi cuvaju u `data/processed/campus/zelene_povrsine.geojson`. Svih pet
 poligona povezano je sa tabelom `zelene_povrsine` preko primarnog kljuca i tipa,
 a geometrije i izracunate povrsine upisane su u PostGIS u EPSG:32634.
-Interaktivna aplikacija vise ne prepisuje prethodni ekran: izbor prikaza cuva
-zajednicki pregled, crtanje parkiralista, zelenih povrsina i infrastrukturnih
-objekata. Infrastrukturni objekti se rucno evidentiraju kao tacke i privremeno
-cuvaju u `data/processed/campus/infrastrukturni_objekti.geojson`. Svih sest
-tacaka povezano je sa tabelom `infrastrukturni_objekti` preko primarnog kljuca i
-naziva, a geometrije su upisane u PostGIS u EPSG:32634.
-U aplikaciju je dodat prikaz `Tereni` sa osam `pitch` poligona iz Geofabrik SHP
-sloja. Svaki poligon ima vidljivu `osm_id` oznaku i povrsinu, kako bi se rucno
-upario sa odgovarajucim nazivom terena iz SQL tabele pre upisa u PostGIS.
+Infrastrukturni objekti su rucno evidentirani kao tacke i sacuvani u
+`data/processed/campus/infrastrukturni_objekti.geojson`. Svih sest tacaka
+povezano je sa tabelom `infrastrukturni_objekti` preko primarnog kljuca i naziva,
+a geometrije su upisane u PostGIS u EPSG:32634. Osam `pitch` poligona iz
+Geofabrik SHP sloja rucno je upareno sa odgovarajucim terenima pre upisa u
+PostGIS.
 
 ## Lokalno pokretanje
 
@@ -111,7 +108,7 @@ python -m src.giscampus.geo.map
 
 Mapa se zatim otvara iz `data/outputs/provera_zgrada.html`.
 
-Pokrenuti interaktivnu aplikaciju za crtanje zona:
+Pokrenuti zavrsnu GIS aplikaciju:
 
 ```powershell
 python -m streamlit run app.py
@@ -119,6 +116,15 @@ python -m streamlit run app.py
 
 Svih osam sportskih terena povezano je sa rucno proverenim OSM poligonima,
 a njihove povrsine i geometrije upisane su u PostGIS.
+
+U aplikaciji je omoguceno ukljucivanje i iskljucivanje svih prostornih slojeva,
+kao i promena njihove boje, providnosti i debljine ivice.
+Kontrole slojeva i simbologije nalaze se direktno na interaktivnoj mapi.
+U bocnoj traci dostupne su CRUD operacije nad svih sest projektnih tabela.
+Dodato je sedam prostornih analiza: clip zgrada u Severnoj zoni, intersection
+parkiralista i zelenila, njihova union operacija, difference kampusa i zgrada,
+buffer infrastrukture, within infrastrukture u Centralnoj zoni i overlaps
+parkinga i zgrada. Rezultat se prikazuje kao sloj i kao DataFrame.
 
 ## Struktura
 
