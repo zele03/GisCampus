@@ -121,6 +121,12 @@ U aplikaciji je omoguceno ukljucivanje i iskljucivanje svih prostornih slojeva,
 kao i promena njihove boje, providnosti i debljine ivice.
 Kontrole slojeva i simbologije nalaze se direktno na interaktivnoj mapi.
 U bocnoj traci dostupne su CRUD operacije nad svih sest projektnih tabela.
+Izbor reda u tabeli naglasava odgovarajuci objekat na mapi, a klik na objekat
+na mapi naglasava njegov red kada je odgovarajuca tabela otvorena u prikazu.
+Dodavanje novog objekta zahteva sve atribute i rucno crtanje geometrije na
+mapi. Za poligone se povrsina automatski racuna u EPSG:32634 pre upisa u bazu.
+Za sve objekte osim same zone strani kljuc `zona_id` automatski se odredjuje
+prema zoni koja potpuno sadrzi nacrtanu geometriju.
 Dodato je sedam prostornih analiza: clip zgrada u Severnoj zoni, intersection
 parkiralista i zelenila, njihova union operacija, difference kampusa i zgrada,
 buffer infrastrukture, within infrastrukture u Centralnoj zoni i overlaps
