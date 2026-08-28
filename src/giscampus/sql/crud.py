@@ -34,6 +34,10 @@ KONFIGURACIJA_TABELA = {
         "primarni_kljuc": "teren_id",
         "kolone": {"zona_id", "naziv", "povrsina_m2", "geometrija"},
     },
+    "ml_zgrade": {
+        "primarni_kljuc": "ml_zgrada_id",
+        "kolone": {"status_provere"},
+    },
 }
 
 

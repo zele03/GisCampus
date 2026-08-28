@@ -123,6 +123,8 @@ Kontrole slojeva i simbologije nalaze se direktno na interaktivnoj mapi.
 U bocnoj traci dostupne su CRUD operacije nad svih sest projektnih tabela.
 Izbor reda u tabeli naglasava odgovarajuci objekat na mapi, a klik na objekat
 na mapi naglasava njegov red kada je odgovarajuca tabela otvorena u prikazu.
+Ukljuceni slojevi ostaju sacuvani tokom izbora objekata, a izbor se moze
+obrisati i dugmetom koje se pojavljuje direktno na mapi.
 Dodavanje novog objekta zahteva sve atribute i rucno crtanje geometrije na
 mapi. Za poligone se povrsina automatski racuna u EPSG:32634 pre upisa u bazu.
 Za sve objekte osim same zone strani kljuc `zona_id` automatski se odredjuje
@@ -153,6 +155,15 @@ Raster se obradjuje preklopljenim iseccima velicine 256 x 256 piksela. Rezultat
 se cuva u data/ml/results/ kao raster verovatnoce, georeferencirana binarna
 maska i PNG pregled originalnog snimka sa oznacenim detekcijama. Detekcije van
 poligona zona kampusa uklanjaju se iz svih izlaznih rezultata.
+
+Binarna maska se zatim pretvara u vektorske poligone. Poligoni manji od 20 m2
+uklanjaju se kao sum i dobijaju povrsinu, prosecnu pouzdanost i pocetni status
+provere. Ako poligon prelazi granicu zona, ostaje jedan ceo objekat i dodeljuje
+mu se zona u kojoj se nalazi najveci deo njegove povrsine. Poligoni se upisuju u
+PostGIS tabelu ml_zgrade i ucitavaju u GeoDataFrame i pandas DataFrame.
+U aplikaciji su prikazani kao poseban sloj ML zgrade. Za njih nisu dozvoljeni
+rucni unos i brisanje; kroz aplikaciju se menja samo status provere na
+nije_potvrdjeno, potvrdjeno ili odbijeno.
 
 ## Struktura
 
