@@ -14,3 +14,8 @@ rasterio
 folium
 streamlit
 streamlit-folium
+
+# Masinsko ucenje za segmentaciju zgrada
+torch
+segmentation-models-pytorch
+Pillow

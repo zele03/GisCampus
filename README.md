@@ -131,6 +131,28 @@ Dodato je sedam prostornih analiza: clip zgrada u Severnoj zoni, intersection
 parkiralista i zelenila, njihova union operacija, difference kampusa i zgrada,
 buffer infrastrukture, within infrastrukture u Centralnoj zoni i overlaps
 parkinga i zgrada. Rezultat se prikazuje kao sloj i kao DataFrame.
+Pripremljena je struktura ML dela i dodat je U-Net model za segmentaciju
+zgrada. Koristi se vec istrenirani U-Net sa ResNet34 enkoderom i dodatnim
+izlazima za granice i rastojanje, bez naseg ponovnog treniranja. Slede priprema
+snimka, provera maske i pretvaranje rezultata u vektorske poligone.
+
+Istrenirane tezine preuzimaju se sa modela
+[nilsho01/unet-resnet34-vhr-buildings](https://huggingface.co/nilsho01/unet-resnet34-vhr-buildings),
+koji je objavljen pod licencom AGPL-3.0. Model je treniran na skupu
+hotosm/vhr-building-segmentation sa RGB ortofoto snimcima i OSM oznakama
+zgrada. U projektu se koristi checkpoint unet_bldg_instance.pth; sam fajl
+tezina se cuva u data/ml/models/ i ne postavlja se na GitHub.
+
+Detekcija zgrada na rasteru kampusa pokrece se komandom:
+
+```powershell
+python -m src.giscampus.ml.detection
+```
+
+Raster se obradjuje preklopljenim iseccima velicine 256 x 256 piksela. Rezultat
+se cuva u data/ml/results/ kao raster verovatnoce, georeferencirana binarna
+maska i PNG pregled originalnog snimka sa oznacenim detekcijama. Detekcije van
+poligona zona kampusa uklanjaju se iz svih izlaznih rezultata.
 
 ## Struktura
 
@@ -144,8 +166,14 @@ GisCampus/
 |   |   |-- data.py               # Ucitavanje i spajanje podataka
 |   |   |-- analysis.py           # Overlay i prostorni upiti
 |   |   `-- map.py                # Slojevi, simbologija i raster
-|   `-- ml.py                      # Masinsko ucenje
+|   `-- ml/                        # Detekcija zgrada masinskim ucenjem
+|       |-- data.py                # Priprema snimaka i maski
+|       |-- model.py               # U-Net model
+|       |-- detection.py           # Pokretanje detekcije
+|       |-- vectorization.py       # Maska u vektorske poligone
+|       `-- visualization.py       # Vizuelna provera rezultata
 |-- data/                          # Lokalni prostorni podaci i rezultati
+|   `-- ml/                        # Snimci, maske, modeli i ML rezultati
 |-- docs/                          # Projektna dokumentacija
 |-- notebooks/                     # Zavrsna demonstraciona sveska
 |-- tests/                         # Automatske provere

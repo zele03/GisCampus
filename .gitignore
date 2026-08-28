@@ -17,6 +17,14 @@ data/processed/*
 !data/processed/.gitkeep
 data/outputs/*
 !data/outputs/.gitkeep
+data/ml/images/*
+!data/ml/images/.gitkeep
+data/ml/masks/*
+!data/ml/masks/.gitkeep
+data/ml/models/*
+!data/ml/models/.gitkeep
+data/ml/results/*
+!data/ml/results/.gitkeep
 
 # Editor and operating-system files
 .vscode/
