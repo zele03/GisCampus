@@ -10,9 +10,10 @@ from rasterio.features import shapes
 from rasterio.mask import mask as iseci_raster
 from shapely.geometry import shape
 
+from src.giscampus.sql.database import kreiraj_tabele, povezi_se
+
 from .detection import PUTANJA_MASKE, PUTANJA_VEROVATNOCE, PUTANJA_ZONA
 from .model import KOREN_PROJEKTA
-from src.giscampus.sql.database import kreiraj_tabele, povezi_se
 
 PUTANJA_VEKTORA = KOREN_PROJEKTA / "data" / "ml" / "results" / "ml_zgrade.geojson"
 MINIMALNA_POVRSINA_M2 = 20.0

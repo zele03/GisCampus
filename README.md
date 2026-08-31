@@ -125,6 +125,8 @@ Izbor reda u tabeli naglasava odgovarajuci objekat na mapi, a klik na objekat
 na mapi naglasava njegov red kada je odgovarajuca tabela otvorena u prikazu.
 Ukljuceni slojevi ostaju sacuvani tokom izbora objekata, a izbor se moze
 obrisati i dugmetom koje se pojavljuje direktno na mapi.
+Isti izbor slojeva koristi se u svim CRUD rezimima, ukljucujuci crtanje
+novog objekta i promenu statusa ML zgrada.
 Dodavanje novog objekta zahteva sve atribute i rucno crtanje geometrije na
 mapi. Za poligone se povrsina automatski racuna u EPSG:32634 pre upisa u bazu.
 Za sve objekte osim same zone strani kljuc `zona_id` automatski se odredjuje
@@ -133,6 +135,12 @@ Dodato je sedam prostornih analiza: clip zgrada u Severnoj zoni, intersection
 parkiralista i zelenila, njihova union operacija, difference kampusa i zgrada,
 buffer infrastrukture, within infrastrukture u Centralnoj zoni i overlaps
 parkinga i zgrada. Rezultat se prikazuje kao sloj i kao DataFrame.
+Dodate su i dve analize ML rezultata: within izdvaja cele ML zgrade u
+Severnoj zoni prema geometriji, a intersection prikazuje zajednicke povrsine
+ML i evidentiranih zgrada, uz ID-eve, naziv evidentirane zgrade i povrsinu
+preseka u m2. Obe analize koriste sve ML statuse i ne menjaju izvorne tabele.
+Nepoklapanje sa evidentiranim zgradama nije automatski greska modela jer
+rucna evidencija ne obuhvata sve zgrade kampusa.
 Pripremljena je struktura ML dela i dodat je U-Net model za segmentaciju
 zgrada. Koristi se vec istrenirani U-Net sa ResNet34 enkoderom i dodatnim
 izlazima za granice i rastojanje, bez naseg ponovnog treniranja. Slede priprema
@@ -164,6 +172,8 @@ PostGIS tabelu ml_zgrade i ucitavaju u GeoDataFrame i pandas DataFrame.
 U aplikaciji su prikazani kao poseban sloj ML zgrade. Za njih nisu dozvoljeni
 rucni unos i brisanje; kroz aplikaciju se menja samo status provere na
 nije_potvrdjeno, potvrdjeno ili odbijeno.
+Pri izboru reda za promenu statusa ML zgrada se odmah naglasava na mapi
+ako je njen sloj ukljucen, bez cekanja na cuvanje statusa.
 
 ## Struktura
 

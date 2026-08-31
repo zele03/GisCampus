@@ -17,7 +17,9 @@ from src.giscampus.geo.analysis import (
     analiza_buffera_infrastrukture,
     analiza_clip_zgrada,
     analiza_infrastrukture_u_centralnoj_zoni,
+    analiza_ml_zgrada_u_severnoj_zoni,
     analiza_preklapanja_parkinga_i_zgrada,
+    analiza_preseka_ml_i_evidentiranih_zgrada,
     analiza_preseka_parkinga_i_zelenila,
     analiza_slobodne_povrsine_kampusa,
     analiza_unije_parkinga_i_zelenila,
@@ -209,6 +211,10 @@ ANALIZE = {
         analiza_infrastrukture_u_centralnoj_zoni
     ),
     "Overlaps - parkinzi i zgrade": analiza_preklapanja_parkinga_i_zgrada,
+    "Within - ML zgrade u Severnoj zoni": analiza_ml_zgrada_u_severnoj_zoni,
+    "Intersection - ML i evidentirane zgrade": (
+        analiza_preseka_ml_i_evidentiranih_zgrada
+    ),
 }
 
 
@@ -750,6 +756,7 @@ def osvezi_podatke() -> None:
     """Ocisti kes nakon CRUD izmene da mapa odmah prikaze novo stanje."""
 
     ucitaj_postgis_sloj.clear()
+    pokreni_analizu.clear()
 
 
 def procitaj_izbor_sa_mape(sadrzaj: str | None) -> dict | None:
@@ -778,6 +785,31 @@ def procitaj_vidljive_slojeve(sadrzaj: str | None) -> set[str] | None:
     if not isinstance(nazivi, list):
         return None
     return {naziv for naziv in nazivi if naziv in SLOJEVI}
+
+
+def obradi_stanje_mape(kljuc_mape: str, dozvoli_izbor: bool = True) -> None:
+    """Sacuvaj dogadjaj mape pre ponovnog iscrtavanja CRUD kontrola."""
+
+    rezultat = st.session_state.get(kljuc_mape, {})
+    sadrzaj = rezultat.get("last_object_clicked_popup")
+    slojevi = procitaj_vidljive_slojeve(sadrzaj)
+    if slojevi is not None:
+        st.session_state["vidljivi_slojevi"] = sorted(slojevi)
+    elif dozvoli_izbor and sadrzaj == "GIS_OBRISI_IZBOR":
+        st.session_state.pop("izabrani_objekat", None)
+    elif dozvoli_izbor:
+        izbor = procitaj_izbor_sa_mape(sadrzaj)
+        if izbor is not None:
+            st.session_state["izabrani_objekat"] = izbor
+
+
+def promeni_analizu_slojeva() -> None:
+    """Promeni pocetne slojeve samo pri eksplicitnom izboru analize."""
+
+    naziv = st.session_state["izabrana_prostorna_analiza"]
+    st.session_state["vidljivi_slojevi"] = (
+        list(SLOJEVI) if naziv == "Bez analize" else []
+    )
 
 
 def stil_izabranog_reda(red, tabela: str, id_kolona: str):
@@ -926,15 +958,34 @@ def prikazi_crud() -> dict:
             f"{float(red['pouzdanost']) * 100:.1f}%"
         )
 
+    kljuc_reda = f"crud_red_{tabela}"
+    prvi_izbor_reda = kljuc_reda not in st.session_state
+
+    def oznaci_ml_zgradu_za_proveru():
+        """Odmah oznaci ML zgradu izabranu za proveru statusa."""
+
+        red_id = st.session_state[kljuc_reda]
+        if red_id in id_vrednosti:
+            st.session_state["izabrani_objekat"] = {
+                "tabela": tabela,
+                "id": int(red_id),
+            }
+
     izabrani_id = st.selectbox(
         "Red",
         id_vrednosti,
         index=podrazumevani_indeks,
         format_func=opis_reda,
-        key=f"crud_red_{tabela}",
+        key=kljuc_reda,
+        on_change=(
+            oznaci_ml_zgradu_za_proveru if operacija == "Promeni status" else None
+        ),
     )
 
     if operacija == "Promeni status":
+        # Oznaci i pocetni red; kasnije promene obradjuje callback iznad.
+        if prvi_izbor_reda:
+            oznaci_ml_zgradu_za_proveru()
         trenutni_status = redovi_po_id.loc[izabrani_id, "status_provere"]
         statusi = ["nije_potvrdjeno", "potvrdjeno", "odbijeno"]
         with st.form(f"promeni_status_{izabrani_id}"):
@@ -1003,6 +1054,8 @@ def prikazi_crud() -> dict:
     return stanje
 
 
+st.session_state.setdefault("vidljivi_slojevi", list(SLOJEVI))
+
 with st.sidebar:
     st.header("GisCampus")
     crud_stanje = prikazi_crud()
@@ -1013,6 +1066,8 @@ with st.sidebar:
             "Analiza",
             list(ANALIZE),
             key="izabrana_prostorna_analiza",
+            persist_state="session",
+            on_change=promeni_analizu_slojeva,
         )
     else:
         izabrana_analiza = "Bez analize"
@@ -1020,13 +1075,7 @@ with st.sidebar:
 st.title("GisCampus")
 rezultat_analize = pokreni_analizu(izabrana_analiza)
 
-if crud_stanje["operacija"] != "Dodaj":
-    prethodna_analiza = st.session_state.get("analiza_za_vidljive_slojeve")
-    if prethodna_analiza != izabrana_analiza:
-        st.session_state["analiza_za_vidljive_slojeve"] = izabrana_analiza
-        st.session_state["vidljivi_slojevi"] = (
-            list(SLOJEVI) if izabrana_analiza == "Bez analize" else []
-        )
+vidljivi_slojevi = set(st.session_state["vidljivi_slojevi"])
 
 if crud_stanje["operacija"] == "Dodaj":
     konfiguracija = crud_stanje["konfiguracija"]
@@ -1037,15 +1086,22 @@ if crud_stanje["operacija"] == "Dodaj":
         "objekat na mapi."
     )
     postojeca_geometrija = st.session_state.get(crud_stanje["kljuc_geometrije"])
+    kljuc_mape_za_dodavanje = f"dodavanje_geometrije_{tabela}"
     rezultat_mape = st_folium(
         napravi_mapu(
             geometrija_za_crtanje=konfiguracija["geometrija"],
             sacuvana_geometrija=postojeca_geometrija,
+            vidljivi_slojevi=vidljivi_slojevi,
         ),
         width=1000,
         height=560,
-        key=f"dodavanje_geometrije_{tabela}",
-        returned_objects=["all_drawings"],
+        key=kljuc_mape_za_dodavanje,
+        returned_objects=[
+            "all_drawings",
+            "last_object_clicked_popup",
+            "last_object_clicked_count",
+        ],
+        on_change=lambda: obradi_stanje_mape(kljuc_mape_za_dodavanje, False),
     )
     crtezi = rezultat_mape.get("all_drawings")
     if crtezi:
@@ -1102,7 +1158,6 @@ if crud_stanje["operacija"] == "Dodaj":
             st.error(f"Objekat nije dodat: {greska}")
 else:
     izabrani_objekat = st.session_state.get("izabrani_objekat")
-    vidljivi_slojevi = set(st.session_state.get("vidljivi_slojevi", SLOJEVI))
     rezultat_mape = st_folium(
         napravi_mapu(
             izabrana_analiza,
@@ -1117,26 +1172,8 @@ else:
             "last_object_clicked_popup",
             "last_object_clicked_count",
         ],
+        on_change=lambda: obradi_stanje_mape("gis_kampus_mapa"),
     )
-    broj_klika = rezultat_mape.get("last_object_clicked_count")
-    prethodni_broj_klika = st.session_state.get("poslednji_broj_klika_na_mapi")
-    if broj_klika is not None and broj_klika != prethodni_broj_klika:
-        st.session_state["poslednji_broj_klika_na_mapi"] = broj_klika
-        sadrzaj_klika = rezultat_mape.get("last_object_clicked_popup")
-        if sadrzaj_klika == "GIS_OBRISI_IZBOR":
-            st.session_state.pop("izabrani_objekat", None)
-            st.rerun()
-        novi_vidljivi_slojevi = procitaj_vidljive_slojeve(sadrzaj_klika)
-        if (
-            novi_vidljivi_slojevi is not None
-            and novi_vidljivi_slojevi != vidljivi_slojevi
-        ):
-            st.session_state["vidljivi_slojevi"] = sorted(novi_vidljivi_slojevi)
-            st.rerun()
-        izbor_sa_mape = procitaj_izbor_sa_mape(sadrzaj_klika)
-        if izbor_sa_mape is not None and izbor_sa_mape != izabrani_objekat:
-            st.session_state["izabrani_objekat"] = izbor_sa_mape
-            st.rerun()
 
 if crud_stanje["operacija"] != "Dodaj" and izabrana_analiza != "Bez analize":
     st.subheader("Rezultat prostorne analize")
