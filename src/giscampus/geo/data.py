@@ -1,7 +1,7 @@
 """Preuzimanje, ucitavanje i priprema prostornih podataka."""
 
-from pathlib import Path
 from os import environ
+from pathlib import Path
 from shutil import copyfileobj
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen

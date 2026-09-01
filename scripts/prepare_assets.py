@@ -1,8 +1,8 @@
 """Preuzimanje lokalnog rastera i, po potrebi, težina ML modela."""
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
 KOREN = Path(__file__).resolve().parents[1]
 if str(KOREN) not in sys.path:

@@ -14,48 +14,50 @@
 
 GisCampus je studentski projekat iz predmeta Osnove geoinformatike, namenjen prikazu i upravljanju podacima o infrastrukturi univerzitetskog kampusa u Novom Sadu. Cilj je da se podaci o zonama, zgradama, parkiralištima, zelenim površinama, infrastrukturnim objektima i sportskim terenima povežu sa njihovim položajem na interaktivnoj mapi.
 
-Razvoj je podeljen na tri celine. SQL deo obuhvata PostgreSQL/PostGIS bazu, povezane tabele, unos i izmenu podataka i upite. GEO deo dodaje vektorske slojeve, rastersku podlogu, ručno označene objekte i prostorne analize. U ML delu primenjuje se već istreniran model za izdvajanje zgrada sa snimka. Dobijene detekcije pretvaraju se u poligone i prikazuju odvojeno od ručno evidentiranih zgrada, uz mogućnost promene statusa provere.
+Razvoj je podeljen na tri celine. SQL deo obuhvata PostgreSQL/PostGIS bazu, povezane tabele, unos i izmenu podataka i upite. GEO deo dodaje vektorske slojeve, rastersku podlogu, ručno označene objekte i prostorne analize. U ML delu primenjuje se već istreniran model za izdvajanje zgrada sa snimka. Dobijene detekcije pretvaraju se u poligone i prikazuju odvojeno od ručno evidentiranih zgrada.
 
-Dokumentacija objašnjava organizaciju projekta, izvore podataka, način rada aplikacije i modela, ostvarene rezultate i ograničenja. Projekat prikazuje odabrane objekte, a ne potpunu evidenciju kampusa. Automatske detekcije mogu sadržati greške, pa njihova pouzdanost ne zamenjuje proveru rezultata.
+Dokumentacija objašnjava organizaciju projekta, izvore, način rada aplikacije i modela, ostvarene rezultate i ograničenja. Projekat prikazuje odabrane objekte, a ne potpunu evidenciju kampusa.
 
 ## Sadržaj
 
-1. Cilj projekta i zahtevi zadatka
+1. [Cilj projekta i zahtevi zadatka](#poglavlje-1)
 
-2. Organizacija projekta i razvojni postupak
+2. [Organizacija projekta i razvojni postupak](#poglavlje-2)
 
-3. Baza podataka i model veza
+3. [Baza podataka i model veza](#poglavlje-3)
 
-4. Rečnik podataka
+4. [Rečnik podataka](#poglavlje-4)
 
-5. Python SQL, početni unos i DataFrame
+5. [Python SQL, početni unos i DataFrame](#poglavlje-5)
 
-6. CRUD operacije i pravila unosa
+6. [CRUD operacije i pravila unosa](#poglavlje-6)
 
-7. SQL JOIN i WHERE upiti
+7. [SQL JOIN i WHERE upiti](#poglavlje-7)
 
-8. Izvori prostornih podataka i koordinatni sistemi
+8. [Izvori prostornih podataka i koordinatni sistemi](#poglavlje-8)
 
-9. Povezivanje vektora i SQL evidencije
+9. [Povezivanje vektora i SQL evidencije](#poglavlje-9)
 
-10. GIS interfejs i korisnički postupci
+10. [GIS interfejs i korisnički postupci](#poglavlje-10)
 
-11. Overlay tehnike i prostorni upiti
+11. [Overlay tehnike i prostorni upiti](#poglavlje-11)
 
-12. ML model: arhitektura i poreklo
+12. [Arhitektura i poreklo ML modela](#poglavlje-12)
 
-13. Obrada rastera i računanje pouzdanosti
+13. [Obrada rastera i računanje pouzdanosti](#poglavlje-13)
 
-14. Vektorizacija, dodela zona i PostGIS upis
+14. [Vektorizacija, dodela zona i PostGIS upis](#poglavlje-14)
 
-15. Rezultati i prostorne analize ML detekcija
+15. [Rezultati i prostorne analize ML detekcija](#poglavlje-15)
 
-16. Provere, ograničenja i budući razvoj
+16. [Provere i ograničenja](#poglavlje-16)
 
-17. Pokretanje i priprema 
+17. [Pokretanje i priprema](#poglavlje-17)
 
-18. Izvori i literatura
+18. [Izvori i literatura](#poglavlje-18)
 
+
+<a id="poglavlje-1"></a>
 
 ## 1. Cilj projekta i zahtevi zadatka
 
@@ -71,7 +73,7 @@ Projekat je razvijan postepeno, kroz SQL, GEO i ML deo. Najpre su napravljene ta
 | Kreirati najmanje pet tabela sa 5-10 kolona, primarnim i stranim ključevima. | Napravljeno je šest osnovnih tabela: zone, zgrade, parkirališta, zelene površine, infrastrukturni objekti i tereni. Imaju po pet ili šest kolona i sopstveni primarni ključ. Sve osim roditeljske tabele zona imaju i strani ključ `zona_id`. Naknadno je dodata tabela `ml_zgrade` sa šest kolona. |
 | Ručno uneti najmanje pet redova u svaku tabelu pomoću INSERT naredbi. | Za šest osnovnih tabela napisane su eksplicitne INSERT naredbe: 5 zona, 14 zgrada, 12 parkirališta, 5 zelenih površina, 6 infrastrukturnih objekata i 8 terena. To je ukupno 50 početnih redova. ML tabela se puni rezultatima modela, a ne ručnim početnim unosom. |
 | Učitati sve podatke pomoću pandas biblioteke i omogućiti CRUD. | Podaci svake tabele učitavaju se u zaseban DataFrame. Implementirani su prikaz, dodavanje, izmena i brisanje redova. Aplikacija koristi ove funkcije i dodaje provere unosa i geometrije. |
-| Napraviti 5-10 JOIN/WHERE upita i sve izvršavati kroz Python. | U `sql/queries.py` definisano je sedam upita koji povezuju tabele po stranom ključu i filtriraju podatke. Rezultati se vraćaju kao DataFrame. Tačan SQL tekst dat je u dodatku B; to su upiti nad kolonama, odvojeni od prostornih analiza na mapi. |
+| Napraviti 5-10 JOIN/WHERE upita i sve izvršavati kroz Python. | U `sql/queries.py` definisano je sedam upita koji povezuju tabele po stranom ključu i filtriraju podatke. Rezultati se vraćaju kao DataFrame.  |
 
 ### Deo 2 - Python GEO
 
@@ -90,6 +92,8 @@ Projekat je razvijan postepeno, kroz SQL, GEO i ML deo. Najpre su napravljene ta
 | Pretvoriti detekcije u vektore, učitati ih u PostGIS i DataFrame i prikazati na mapi. | Maska je pretvorena u poligone, mali rezultati su filtrirani, a svakom objektu dodeljena je zona najvećeg preklapanja. Rezultati se čuvaju u `ml_zgrade`, učitavaju za tabelarni prikaz i prikazuju kao zaseban sloj. |
 | Dodati atribute i omogućiti njihovu izmenu kroz aplikaciju. | Detekcije imaju ID, zonu, površinu, pouzdanost, geometriju i status provere. Korisnik menja status provere u potvrđeno, odbijeno ili nije potvrđeno, uz istovremeno označavanje objekta na mapi. |
 | Napraviti prostorne analize rezultata. | Dodate su dve analize: ML zgrade potpuno unutar Severne zone i presek ML detekcija sa evidentiranim zgradama. Njihova realizacija i rezultati opisani su u poglavlju 15. |
+
+<a id="poglavlje-2"></a>
 
 ## 2. Organizacija projekta i razvojni postupak
 
@@ -140,7 +144,7 @@ tests/ → test_ml_analyses.py
 
 - `sql/database.py` uspostavlja konekciju, kreira bazu i PostGIS ekstenziju, definiše tabele i početne INSERT naredbe. Sadrži i učitavanje tabela u pandas DataFrame.
 - `sql/crud.py` sadrži prikaz, dodavanje, izmenu i brisanje redova. Pri prostornom unosu proverava atribute i geometriju, pronalazi zonu i računa površinu.
-- `sql/queries.py` sadrži sedam SQL upita sa JOIN i WHERE uslovima, njihove parametre i funkcije za izvršavanje. Oni povezuju podatke po ključevima; nisu clip, buffer i ostale geometrijske analize.
+- `sql/queries.py` sadrži sedam SQL upita sa JOIN i WHERE uslovima, njihove parametre i funkcije za izvršavanje.
 
 ### GEO - prostorni podaci i analize
 
@@ -156,25 +160,19 @@ tests/ → test_ml_analyses.py
 - `ml/visualization.py` pravi sliku za poređenje originalnog snimka, obojenih detekcija i binarne maske.
 - `ml/vectorization.py` pretvara masku u poligone, računa površinu i pouzdanost, dodeljuje zone, izvozi GeoJSON i upisuje rezultate u PostGIS.
 
-### Zajednički fajlovi
+### Ostali fajlovi
 
-`app.py` povezuje sve delove u aplikaciju: mapu, slojeve i stilove, prikaz tabela, CRUD, proveru ML detekcija i prostorne analize. `config.py` sadrži zajednička podešavanja, uključujući podatke za konekciju. Fajlovi `__init__.py` označavaju Python pakete i ne predstavljaju zasebne korake obrade.
+`app.py` povezuje sve delove u aplikaciju: mapu, slojeve i stilove, prikaz tabela, CRUD, proveru ML detekcija i prostorne analize. `config.py` sadrži zajednička podešavanja, uključujući podatke za konekciju. 
 
-`scripts/backup_database.ps1` pravi prenosivu kopiju sedam projektnih tabela, a `scripts/restore_database.ps1` ih obnavlja uz obaveznu potvrdu `-Force`. `scripts/prepare_assets.py` preuzima raster i opciono težine modela, dok `scripts/check_setup.py` proverava fajlove, PostGIS i broj redova pre pokretanja.
+`scripts/backup_database.ps1` pravi prenosivu kopiju sedam projektnih tabela, `scripts/restore_database.ps1` ih obnavlja uz obaveznu potvrdu `-Force`, `scripts/prepare_assets.py` preuzima raster i opciono težine modela, `scripts/check_setup.py` proverava fajlove, PostGIS i broj redova pre pokretanja.
 
 Projekat je razvijan u VS Code-u, uz Python virtuelno okruženje .venv i Git/GitHub.
 
-Komentari, nazivi domenskih atributa i objašnjenja pisani su na srpskom jeziku, dok su standardni nazivi modula i biblioteka na engleskom. 
+.env, veliki rasteri, SHP arhiva, težine modela i ML rasterski izlazi ne postavljaju se u repozitorijum. Mali ručno pripremljeni GeoJSON fajlovi i rezervna kopija projektnih tabela jesu deo repozitorijuma. Zbog toga se posle kloniranja baza obnavlja iz backupa, a raster preuzima posebnom komandom.
 
-.env sadrži lokalne pristupne podatke i isključen je iz Git-a. Veliki rasteri, SHP arhiva, težine modela i ML rasterski izlazi ne postavljaju se u repozitorijum. Mali ručno pripremljeni GeoJSON fajlovi i rezervna kopija projektnih tabela jesu deo repozitorijuma. Zbog toga se posle kloniranja baza obnavlja iz backupa, a raster preuzima posebnom komandom.
+<a id="poglavlje-3"></a>
 
 ## 3. Baza podataka i model veza
-
-PostgreSQL je sistem za upravljanje relacionim bazama podataka. Projektna baza gis_kampus predstavlja zasebnu logičku celinu na PostgreSQL serveru. PostGIS proširuje PostgreSQL geometrijskim tipovima i prostornim funkcijama.
-
-Model podataka je plan kako su podaci organizovani: koje tabele postoje, koje kolone imaju, šta predstavlja jedan red i kako su tabele povezane. U ovom projektu, na primer, jedan red u tabeli `zgrade` predstavlja evidentiranu zgradu, a `zona_id` je povezuje sa njenom zonom.
-
-Relacioni podaci su podaci raspoređeni u tabele koje se mogu međusobno povezivati pomoću ključeva. Naziv zone zato ne moramo ponavljati u svakom redu zgrada: čuvamo njen ID, a JOIN upitom dobijamo naziv i ostale podatke iz tabele zona. Baza nije isto što i tabela - projektna baza sadrži sve ove povezane tabele.
 
 Tabela zone_kampusa sadrži Severnu, Južnu, Istočnu, Zapadnu i Centralnu zonu, sa oznakama S, J, I, Z i C. Ona je roditeljska tabela. Sve ostale tabele imaju zona_id koji upućuje na zone_kampusa.zona_id. Jedna zona može sadržati više drugih objekata. Sama zona nema  dodat strani ključ jer u ovom modelu ne zavisi od druge tabele.
 
@@ -188,7 +186,9 @@ Tabela zone_kampusa sadrži Severnu, Južnu, Istočnu, Zapadnu i Centralnu zonu,
 | tereni | 8 | Polygon |
 | ml_zgrade | 56 | Polygon |
 
-Primarni ključevi koriste INTEGER GENERATED ALWAYS AS IDENTITY. ID nije redni broj reda u prikazu i ne mora ostati neprekinut posle brisanja. Nazivi infrastrukturnih objekata ne moraju biti jedinstveni; dva reda mogu imati isti naziv i razlikovati se po ID-u. ON DELETE RESTRICT sprečava brisanje zone dok postoje redovi koji je koriste.
+Primarni ključevi koriste INTEGER GENERATED ALWAYS AS IDENTITY. ID nije redni broj reda u prikazu i ne mora ostati neprekinut posle brisanja. ON DELETE RESTRICT sprečava brisanje zone dok postoje redovi koji je koriste.
+
+<a id="poglavlje-4"></a>
 
 ## 4. Rečnik podataka
 
@@ -202,11 +202,13 @@ Primarni ključevi koriste INTEGER GENERATED ALWAYS AS IDENTITY. ID nije redni b
 | tereni | teren_id INTEGER (PK); zona_id INTEGER (FK); naziv VARCHAR(120); povrsina_m2 NUMERIC(12,2); geometrija Polygon. |
 | ml_zgrade | ml_zgrada_id INTEGER (PK); zona_id INTEGER (FK); povrsina_m2 NUMERIC(12,2); pouzdanost NUMERIC(5,4); status_provere VARCHAR(30); geometrija Polygon. |
 
-Sve geometrije u bazi definisane su u SRID 32634 koordinatnom sistemu. UNIQUE znači da se ista vrednost ne sme ponoviti u toj koloni.
+Sve geometrije u bazi definisane su u SRID 32634 koordinatnom sistemu.
 
-Kolone `geometrija` i `povrsina_m2` postoje od kreiranja osnovnih tabela, ali pri početnom ručnom unosu imaju vrednost NULL, jer objekti tada još nisu povezani sa prostornim podacima. Njihove geometrije i površine popunjavaju se kasnije, u GEO delu. NULL ovde znači da podatak još nije unet, a ne da kolona ne postoji ili da baza nije povezana sa PostGIS-om.
+Kolone `geometrija` i `povrsina_m2` postoje od kreiranja osnovnih tabela, ali pri početnom ručnom unosu imaju vrednost NULL, jer objekti tada još nisu povezani sa prostornim podacima. Njihove geometrije i površine popunjavaju se kasnije, u GEO delu.
 
 ML tabela zahteva popunjenu geometriju, površinu i pouzdanost. Pouzdanost ima CHECK ograničenje od 0 do 1, a status dozvoljava `nije_potvrdjeno`, `potvrdjeno` ili `odbijeno`. Početna vrednost statusa je `nije_potvrdjeno`.
+
+<a id="poglavlje-5"></a>
 
 ## 5. Python SQL, početni unos i DataFrame
 
@@ -214,14 +216,14 @@ Povezivanje je realizovano bibliotekom psycopg2. Funkcija ucitaj_podesavanja_baz
 
 pripremi_bazu() redom poziva kreiraj_bazu(), ukljuci_postgis(), kreiraj_tabele() i unesi_pocetne_podatke(). Kreiranje tabela izvršava se pozivom cursor.execute(SQL_KREIRANJE_TABELA), odnosno SQL naredbe CREATE TABLE pokreće Python biblioteka. 
 
-Početni unos je napisan eksplicitnim SQL INSERT naredbama u SQL_UNOS_PODATAKA. Zone se unose prve, a drugi redovi koriste podupit po oznaci zone da dobiju stvarni zona_id.
-
 ### Sadržaj početne evidencije
 
 Zgrade obuhvataju Tehnološki, Poljoprivredni, Pravni, Filozofski, Fakultet tehničkih nauka, Prirodno-matematički i Ekonomski fakultet; Visoku poslovnu školu; Naučno-tehnološki park; domove Slobodan Bajić i Veljko Vlahović; Veseli vrtić; Rektorat i Institut BioSens. Ekonomski fakultet vodi se u Zapadnoj, a FTN u Centralnoj zoni.
 
 Parkirališta imaju nazive parkiraliste_1 do parkiraliste_12: šest javnih i šest privatnih. Zelene površine su park u Istočnoj, livada u Severnoj i tri dvorišta u Zapadnoj zoni. Infrastrukturu čine dve trafostanice, fontana, dva parkirališta za bicikle i kontejner. Fontana je neispravna. Osam terena je evidentirano u Južnoj zoni: fudbal, tri mala fudbala, dve košarke, tenis i odbojka.
 
+
+<a id="poglavlje-6"></a>
 
 ## 6. CRUD operacije i pravila unosa
 
@@ -234,15 +236,15 @@ Parkirališta imaju nazive parkiraliste_1 do parkiraliste_12: šest javnih i še
 
 Za dodavanje kroz aplikaciju popunjavaju se svi traženi atributi. Prazan tekst i tekst sastavljen samo od razmaka nisu dovoljni. Geometrija mora biti nacrtana, neprazna, ispravna i odgovarajućeg tipa. Infrastrukturni objekti crtaju se kao tačke, a ostali kao poligoni. Za zgrade se poligon pri upisu pretvara u MultiPolygon.
 
-Koordinate crteža iz mape transformišu se iz EPSG:4326 u EPSG:32634. Površina se automatski računa iz geometrije u metrima i zaokružuje na dve decimale.
-
 ### Automatska dodela zone pri novom unosu
 
 pronadji_zonu_za_geometriju() traži zonu za koju ST_Covers(zona, objekat) vraća tačno. Ceo objekat mora biti unutar zone ili na njenoj granici; nijedan deo ne sme biti van nje. Ovo pravilo se ne primenjuje na samu novu zonu. [[1]](#ref-1)
 
 Pri početnim INSERT naredbama zone su birane ručno. Pri novom unosu kroz aplikaciju strani ključ računa se prostorno. Kod ML rezultata važi drugačije pravilo - zona najvećeg preklapanja, opisano u poglavlju 14.
 
-ML tabela u korisničkom interfejsu nema opcije za ručno dodavanje ili brisanje. Dozvoljena je samo promena statusa provere.
+Kod ML tabele dozvoljena je promena statusa provere.
+
+<a id="poglavlje-7"></a>
 
 ## 7. SQL JOIN i WHERE upiti
 
@@ -258,7 +260,9 @@ Spajanje dve ili više tabela preko stranog ključa i filtriranje podataka pomo�
 | `tereni_u_juznoj_zoni` | Spaja terene i zone. Filtrira oznaku zone J i prikazuje ID i naziv terena, uz naziv zone. |
 | `zgrade_i_javna_parkiralista_po_zonama` | Spaja tri tabele: zone, zgrade i parkirališta. Izdvaja javna parkirališta i za svaku prikazanu zonu računa broj različitih zgrada i javnih parkirališta. |
 
-## 8. Izvori podataka i koordinatni sistemi
+<a id="poglavlje-8"></a>
+
+## 8. Izvori prostornih podataka i koordinatni sistemi
 
 Vektorski podaci preuzeti su iz Geofabrik SHP paketa za Srbiju zasnovanog na OpenStreetMap podacima. Arhiva je preuzeta u data/raw/vector/. [[2]](#ref-2)
 
@@ -272,11 +276,11 @@ Ceo paket Srbije je prvobitno preuzet, a zatim učitan pravougaoni obuhvat (19.8
 | Tačkasti objekti | gis_osm_pois_free_1.shp | 226 |
 | Poligonski objekti | gis_osm_pois_a_free_1.shp | 42 |
 
-Ovi brojevi odnose se na lokalno korišćenu verziju SHP podataka, ne na celokupnu Srbiju.
+Ovi brojevi odnose se na lokalno korišćenu verziju SHP podataka.
 
 Rasterska podloga preuzeta je sa Esri World Imagery export servisa i sačuvana je kao `data/raw/raster/kampus_esri.tif`. Servisu se prosleđuju bboxSR=4326, imageSR=4326 i dimenzije 2400 x 1500. Sačuvani TIFF ima četiri kanala, dok prikaz i model koriste prva tri kao RGB. [[3]](#ref-3)
 
-EPSG:4326 koristi geografske koordinate u stepenima i služi za razmenu sa veb mapom. 
+<a id="poglavlje-9"></a>
 
 ## 9. Povezivanje vektora i SQL evidencije
 
@@ -284,17 +288,15 @@ Geometrije se čuvaju u .shp, atributi u .dbf, indeks u .shx, opis koordinatnog 
 
 Za zgrade je napravljen Python rečnik OSM_POLIGONI_ZGRADA u geo/map.py. Ključevi su nazivi zgrada iz SQL evidencije, a vrednosti jedan ili više osm_id brojeva iz SHP-a.
 
-FTN je povezan sa šest izvornih poligona, PMF sa sedam, a druge evidentirane zgrade  sa jednim. Geometrije se spajaju i predstavljaju kao MultiPolygon. Za Rektorat je odabran samo centralni objekat. Ukupno je povezano 14 evidentiranih zgrada, što ne znači da na kampusu zaista postoji samo 14 zgrada.
-
 ### Ručno crtani slojevi
 
-Nacrtan je okvir kampusa i pet zona. ocisti_zone() deli linijsku mrežu granica na poligonske delove, odseca ih okvirom i dodeljuje zonama prema preklapanju. Cilj je uklanjanje rupa i preklapanja u početnoj podeli. Konačne zone čuvaju se u data/processed/campus/zone.geojson.
+Nacrtan je okvir kampusa i pet zona. ocisti_zone() deli linijsku mrežu granica na poligonske delove, odseca ih okvirom i dodeljuje zonama prema preklapanju. Zone čuvaju se u data/processed/campus/zone.geojson.
 
-Parkirališta i zelene površine nacrtani su ručno preko rastera, a infrastrukturni objekti označeni tačkama. Ovi slojevi povezani su sa postojećim SQL redovima preko primarnih ključeva i dodatno naziva ili tipa. Ručni crteži čuvaju se kao parkiralista.geojson, zelene_povrsine.geojson i infrastrukturni_objekti.geojson. Pri upisu su izračunate površine poligona u EPSG:32634.
+Parkirališta i zelene površine nacrtani su ručno preko rastera, a infrastrukturni objekti označeni tačkama. Ovi slojevi povezani su sa postojećim SQL redovima preko primarnih ključeva i dodatno naziva ili tipa. Ručni crteži čuvaju se kao parkiralista.geojson, zelene_povrsine.geojson i infrastrukturni_objekti.geojson.
 
-Svih 8 tereni preuzeti su iz poligonskih OSM objekata. 
+Svih 8 terena preuzeti su iz poligonskih OSM objekata. 
 
-Napomena: GeoJSON datoteke i baza nisu automatski sinhronizovana dvosmerna kopija: kasnije izmene baze mogu zahtevati osvežavanje izvoznih fajlova.
+<a id="poglavlje-10"></a>
 
 ## 10. GIS interfejs i korisnički postupci
 
@@ -303,6 +305,8 @@ Aplikacija se pokreće komandom python -m streamlit run app.py. Streamlit obezbe
 Na mapi se zasebno uključuje i isključuje prikaz svih slojeva. Kontrola stila omogućava promenu boje, providnosti i debljine ivice.
 
 Bočna traka omogućava izbor tabele i CRUD operacije.
+
+<a id="poglavlje-11"></a>
 
 ## 11. Overlay tehnike i prostorni upiti
 
@@ -319,6 +323,8 @@ Analize u geo/analysis.py učitavaju potrebne podatke iz PostGIS-a kao GeoDataFr
 | Buffer - 30 m oko infrastrukture | Pravi okolinu od 30 metara oko svake tačke. |
 | Within - infrastruktura u Centralnoj zoni | Izdvaja tačke unutar centralnog poligona. |
 | Overlaps - parkinzi i zgrade | Traži delimično preklapanje površina, bez potpunog sadržavanja. |
+
+<a id="poglavlje-12"></a>
 
 ## 12. Arhitektura i poreklo ML modela
 
@@ -344,7 +350,9 @@ Model koristi jedan izlazni kanal - masku zgrada koja govori o sigurnosti modela
 
 Prema dokumentaciji preuzetog modela, za njegovo originalno treniranje korišćeni su: AdamW, batch 32, learning rate 1e-4 za enkoder i 1e-3 za dekoder, weight decay 1e-4 i zaustavljanje na 23. epohi od najviše 50. To nisu parametri našeg lokalnog treniranja, jer ga nismo sprovodili. [[5]](#ref-5)
 
-## 13. Obrada rastera i pouzdanost
+<a id="poglavlje-13"></a>
+
+## 13. Obrada rastera i računanje pouzdanosti
 
 ml/data.py učitava prva tri kanala rastera i čuva njegov profil. Snimak se deli na isečke 256 x 256, sa preklapanjem 64 piksela. Korak je zato 192 piksela. Lista početnih pozicija uključuje i poslednji isečak koji pokriva kraj slike. Po četiri isečka obrađuju se u jednom paketu.
 
@@ -363,11 +371,13 @@ Rezultati se čuvaju u data/ml/results/: verovatnoca_zgrada.tif sadrži float32 
 
 ### Pouzdanost jednog detektovanog objekta
 
-_prosecna_pouzdanost() u vectorization.py izdvaja vrednosti rastera verovatnoće unutar poligona i računa njihovu aritmetičku sredinu. Na primer, za ocene 0.90, 0.80, 0.95 i 0.85 prosek je 0.875, odnosno 87.5%. Računanje se vrši nad poligonom nastalim iz maske pre pojednostavljivanja njegovih granica. Vrednost se za bazu zaokružuje na četiri decimale.
+_prosecna_pouzdanost() u vectorization.py izdvaja vrednosti rastera verovatnoće unutar poligona i računa njihovu aritmetičku sredinu. Na primer, za ocene 0.90, 0.80, 0.95 i 0.85 prosek je 0.875, odnosno 87.5%.
 
 Pouzdanost nije izmerena tačnost modela niti kalibrisana verovatnoća da je ceo objekat zaista zgrada. Model može biti samouveren i kada greši. Prosek se računa nad već izdvojenim pikselima detekcije. Zato se odvojeno čuva status ljudske provere.
 
-## 14. Vektorizacija, dodela zone i PostGIS upis
+<a id="poglavlje-14"></a>
+
+## 14. Vektorizacija, dodela zona i PostGIS upis
 
 vektorizuj_detekcije() čita masku i raster verovatnoće. rasterio.features.shapes() pretvara povezane piksele vrednosti 1 u poligonske geometrije. Transformacija rastera obezbeđuje stvarne koordinate, a shapely.geometry.shape() pretvara dobijeni opis u geometrijski objekat. Rezultati se stavljaju u GeoDataFrame. [[9]](#ref-9)
 
@@ -375,7 +385,7 @@ Poligoni se transformišu u EPSG:32634. explode() razdvaja višedelne geometrije
 
 ### Dodela zone najvećeg preklapanja
 
-Učita se zone.geojson i izračuna intersection svake detekcije sa zonama. Površine tih privremenih preseka sortiraju se opadajuće. Za svaku detekciju zadržava se naziv zone sa najvećim presekom. Konačni rezultat uzima originalni poligon detekcije, a ne isečeni poligon preseka. Tako jedna zgrada ostaje jedan objekat i kada prelazi unutrašnju granicu zona.
+Učita se zone.geojson i izračuna intersection svake detekcije sa zonama. Površine tih privremenih preseka sortiraju se opadajuće. Za svaku detekciju zadržava se naziv zone sa najvećim presekom. Konačni rezultat uzima originalni poligon detekcije, a ne isečeni poligon preseka.
 
 Izraz većinski deo ovde znači najveći među izračunatim presecima; kod ne zahteva da pobednički deo obavezno bude veći od 50% ukupne površine.
 
@@ -383,11 +393,11 @@ upisi_u_postgis() čita nazive i ID-eve zona iz baze i formira rečnik naziv -> 
 
 ### Dve odvojene evidencije zgrada
 
-ml_zgrade ne sadrži strani ključ ka zgrade. Evidentirane zgrade i automatski rezultati prikazuju se kao odvojeni slojevi. Ne pretpostavlja se jedan-na-jedan odnos zbog snimka relativno male rezolucije.
+ml_zgrade ne sadrži strani ključ ka zgrade. Evidentirane zgrade i automatski rezultati prikazuju se kao odvojeni slojevi.
 
-Rezultat se izvozi i u ml_zgrade.geojson u EPSG:4326. Njegov detekcija_id nije isti koncept kao baza ml_zgrada_id i ne treba se oslanjati na njihovu trajnu jednakost. Funkcija podrazumevano preskače novi upis ako ML tabela već ima redove. Eksplicitna zamena postojećih rezultata odbija se ako je neki status već promenjen. GeoJSON iz prethodnog izvoza ne osvežava se automatski kada korisnik promeni status u bazi.
+<a id="poglavlje-15"></a>
 
-## 15. Rezultati i ML prostorne analize
+## 15. Rezultati i prostorne analize ML detekcija
 
 | Pokazatelj, presek 31.08.2026. | Vrednost |
 | --- | --- |
@@ -414,13 +424,13 @@ Nepoklapanje detekcija sa evidentiranim zgradama nije automatski greška modela 
 
 ![Pregled detekcije: originalni raster, detekcije i maska](../data/ml/results/pregled_detekcije.png)
 
-Slika 1. Postojeći rezultat lokalne detekcije: originalni raster (levo), cijan označene detekcije (sredina) i binarna maska (desno). Podloga: Esri World Imagery i dobavljači snimaka. Ovo nije snimak ekrana korisničkog interfejsa.
+Slika 1. Postojeći rezultat lokalne detekcije: originalni raster (levo), označene detekcije (sredina) i binarna maska (desno). Podloga: Esri World Imagery.
 
 Vizuelni pregled omogućava da se proceni da li obojene površine prate krovove, da li se susedne zgrade spajaju i da li se javljaju lažne detekcije na drugim površinama. Binarna maska pokazuje piksele pre konačnog filtriranja poligona po površini i ne treba je poistovetiti sa tačnim konačnim vektorskim slojem iz baze.
 
 Snimak ima ograničenu rezoluciju i ne prikazuje sve detalje jednako jasno. Senke, drveće, boja krova, ortorektifikacija i razlike datuma snimaka mogu uticati na poklapanje. Korisnik zato u aplikaciji odvojeno uključuje raster, evidentirane zgrade i ML sloj, bira detekciju i menja njen status nakon pregleda.
 
-Za prihvatanje rezultata na odbrani treba pokazati makar jedan primer dobro izdvojenog krova, jedan granični slučaj i jedan odbijen rezultat. Ne treba birati samo najbolje primere i predstavljati ih kao dokaz ukupne tačnosti.
+<a id="poglavlje-16"></a>
 
 ## 16. Provere i ograničenja
 
@@ -434,70 +444,33 @@ Nema kompletnog nezavisnog referentnog skupa za kampus, pa nisu izmereni lokalni
 
 Prag 0.5 i minimalna površina 20 m2 nisu optimizovani na lokalnom validacionom skupu. Podloga i OSM evidencija mogu poticati iz različitih perioda.
 
-Verzije direktnih Python biblioteka zaključane su u requirements.txt prema proverenom lokalnom okruženju. Geofabrik latest adresa i model main adresa ipak mogu kasnije vratiti novije podatke ili težine. Prenos projektnih tabela i ručnih crteža sada je podržan backup/restore skriptama, ali backup mora ponovo da se napravi nakon važnih izmena baze. Aplikacija nije testirana kao javni servis sa više korisnika.
+<a id="poglavlje-17"></a>
 
-## 17. Pokretanje i priprema za odbranu
+## 17. Pokretanje i priprema
 
-### Postavljanje na novom računaru
+Za rad su potrebni Python 3.12, PostgreSQL sa PostGIS dodatkom, lokalni `.env` i rasterska podloga. Repozitorijum sadrži rezervnu kopiju sedam projektnih tabela i male ručno pripremljene GeoJSON fajlove, dok se veliki raster i težine modela preuzimaju po potrebi. Detaljno postavljanje projekta na novom računaru, redosled komandi i objašnjenje backup/restore postupka nalaze se u README.md.
+
+### Svakodnevno pokretanje
 
 ```
-# Python 3.12 okruženje i zaključane biblioteke
-py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-
-# Lokalna podešavanja; zatim ručno upisati PostgreSQL lozinku u .env
-Copy-Item .env.example .env
-```
-
-Na računaru moraju biti instalirani PostgreSQL i PostGIS. Projekat je razvijan sa Python 3.12, PostgreSQL 17.11 i PostGIS 3.6.2. `.env` se pravi lokalno jer sadrži lozinku i ne ulazi u Git.
-
-### Baza, raster i provera
-
-```
-# Obnavlja svih sedam tabela, geometrije i trenutne ML statuse
-.\scripts\restore_database.ps1 -Force
-
-# Preuzima rastersku podlogu koja zbog veličine nije u Git-u
-python scripts/prepare_assets.py
-
-# Proverava .env, fajlove, PostGIS i sve projektne tabele
 python scripts/check_setup.py
-
-# Pokretanje aplikacije
 python -m streamlit run app.py
 ```
 
-Rezervna kopija `data/backup/gis_kampus.backup` sadrži šemu i podatke sedam projektnih tabela, uključujući geometrije, strane ključeve, identity brojače i statuse ML provere. Restore skripta zamenjuje te tabele i zato zahteva eksplicitni parametar `-Force`; odbija sistemske baze. Raster se zasebno preuzima sa Esri servisa. Potpuno uputstvo i redosled koraka dati su u README.md.
-
-Nakon promene podataka ili statusa treba osvežiti rezervnu kopiju:
+Provera prijavljuje da li postoje potrebni fajlovi, da li je PostGIS dostupan i koliko redova imaju projektne tabele. Nakon važnih promena podataka, geometrija ili ML statusa treba napraviti novu rezervnu kopiju:
 
 ```
 .\scripts\backup_database.ps1 -Force
 ```
 
-### ML obrada i testovi
+### ML obrada i odbrana
 
-```
-# Ponovno pokretanje modela prepisuje izlazne rastere
-python scripts/prepare_assets.py --with-model
-python -m src.giscampus.ml.detection
-# Vektorizacija; postojeći ML redovi se podrazumevano ne zamenjuju
-python -m src.giscampus.ml.vectorization
-# Provera prostornih analiza bez izmene baze
-python -m unittest discover -s tests -p test_ml_analyses.py -v
-```
+Za običan pregled nije potrebno ponovo pokretati ML model jer aplikacija čita sačuvane rezultate iz baze. Komande za novu detekciju, vektorizaciju i testove navedene su u README-u.
 
-Za običan pregled aplikacije nije potrebno ponovo pokretati ML model. On se izvršava zasebno, a aplikacija čita sačuvane rezultate iz baze. Ponovno generisanje GeoJSON-a i preskakanje postojećeg SQL upisa može ostaviti različite verzije datoteke i baze, pa te korake treba pokretati svesno.
-
-Predlog demonstracije: prikazati strukturu tabela i FK, izvršiti jedan JOIN upit, pokazati raster i vektore, objasniti EPSG, demonstrirati uključivanje slojeva i izbor objekta, dodati test objekat validnom geometrijom, pokazati jednu GEO analizu, zatim ML sloj i status provere, i na kraju dve ML analize. Test podatke ukloniti samo uz proveru tačnog ID-a.
-
-Pre odbrane treba pokrenuti `python scripts/check_setup.py`, proveriti aplikaciju i napraviti svež backup. Biblioteke za veb mapu mogu i dalje koristiti spoljne JavaScript/CSS resurse, pa potpuna offline funkcionalnost nije dokazana samo time što je raster lokalni.
+<a id="poglavlje-18"></a>
 
 ## 18. Izvori i literatura
-
-Izvori su numerisani redom prvog pojavljivanja u tekstu. Ponovljeni broj označava ponovni poziv na isti izvor, a ne novu referencu.
 
 <a id="ref-1"></a>
 
