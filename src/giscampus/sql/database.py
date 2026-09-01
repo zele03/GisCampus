@@ -64,6 +64,17 @@ CREATE TABLE IF NOT EXISTS tereni (
     povrsina_m2 NUMERIC(12, 2) CHECK (povrsina_m2 > 0),
     geometrija geometry(Polygon, 32634)
 );
+
+-- Zgrade automatski izdvojene iz ortofoto snimka ML modelom.
+CREATE TABLE IF NOT EXISTS ml_zgrade (
+    ml_zgrada_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    zona_id INTEGER NOT NULL REFERENCES zone_kampusa(zona_id) ON DELETE RESTRICT,
+    povrsina_m2 NUMERIC(12, 2) NOT NULL CHECK (povrsina_m2 > 0),
+    pouzdanost NUMERIC(5, 4) NOT NULL CHECK (pouzdanost BETWEEN 0 AND 1),
+    status_provere VARCHAR(30) NOT NULL DEFAULT 'nije_potvrdjeno'
+        CHECK (status_provere IN ('nije_potvrdjeno', 'potvrdjeno', 'odbijeno')),
+    geometrija geometry(Polygon, 32634) NOT NULL
+);
 """
 
 SQL_UNOS_PODATAKA = """
@@ -138,6 +149,7 @@ PROJEKTNE_TABELE = (
     "zelene_povrsine",
     "infrastrukturni_objekti",
     "tereni",
+    "ml_zgrade",
 )
 
 

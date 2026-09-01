@@ -1,0 +1,13 @@
+{
+"type": "FeatureCollection",
+"name": "infrastrukturni_objekti",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "infrastrukturni_objekat_id": 1.0, "naziv": "Trafostanica 1", "zona_id": 4.0, "zona": "Zapadna", "stanje": "dobro" }, "geometry": { "type": "Point", "coordinates": [ 19.848588, 45.244709 ] } },
+{ "type": "Feature", "properties": { "infrastrukturni_objekat_id": 2.0, "naziv": "Trafostanica 2", "zona_id": 4.0, "zona": "Zapadna", "stanje": "dobro" }, "geometry": { "type": "Point", "coordinates": [ 19.848376, 45.245156 ] } },
+{ "type": "Feature", "properties": { "infrastrukturni_objekat_id": 3.0, "naziv": "Fontana", "zona_id": 4.0, "zona": "Zapadna", "stanje": "neispravno" }, "geometry": { "type": "Point", "coordinates": [ 19.848824, 45.245738 ] } },
+{ "type": "Feature", "properties": { "infrastrukturni_objekat_id": 4.0, "naziv": "Parkiraliste za bicikle", "zona_id": 4.0, "zona": "Zapadna", "stanje": "dobro" }, "geometry": { "type": "Point", "coordinates": [ 19.848269, 45.244985 ] } },
+{ "type": "Feature", "properties": { "infrastrukturni_objekat_id": 5.0, "naziv": "Parkiraliste za bicikle", "zona_id": 5.0, "zona": "Centralna", "stanje": "dobro" }, "geometry": { "type": "Point", "coordinates": [ 19.851281, 45.245737 ] } },
+{ "type": "Feature", "properties": { "infrastrukturni_objekat_id": 6.0, "naziv": "Kontejner", "zona_id": 1.0, "zona": "Severna", "stanje": "dobro" }, "geometry": { "type": "Point", "coordinates": [ 19.849469, 45.246343 ] } }
+]
+}

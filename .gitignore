@@ -15,8 +15,23 @@ data/raw/raster/*
 !data/raw/raster/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/campus/
+!data/processed/campus/*.geojson
 data/outputs/*
 !data/outputs/.gitkeep
+data/ml/images/*
+!data/ml/images/.gitkeep
+data/ml/masks/*
+!data/ml/masks/.gitkeep
+data/ml/models/*
+!data/ml/models/.gitkeep
+data/ml/results/*
+!data/ml/results/.gitkeep
+
+# Prenosiva rezervna kopija projektnih tabela
+data/backup/*
+!data/backup/.gitkeep
+!data/backup/gis_kampus.backup
 
 # Editor and operating-system files
 .vscode/

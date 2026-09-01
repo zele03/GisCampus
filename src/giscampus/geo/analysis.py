@@ -330,6 +330,10 @@ def upisi_terene_u_postgis() -> int:
 
 
 UPITI_SLOJEVA_ZA_ANALIZE = {
+    "ml_zgrade": """
+        SELECT ml_zgrada_id, zona_id, pouzdanost, status_provere, geometrija
+        FROM ml_zgrade WHERE geometrija IS NOT NULL;
+    """,
     "zone": """
         SELECT zona_id, naziv, geometrija
         FROM zone_kampusa WHERE geometrija IS NOT NULL;
@@ -468,4 +472,38 @@ def analiza_preklapanja_parkinga_i_zgrada() -> gpd.GeoDataFrame:
         rsuffix="zgrada",
     )
     rezultat["analiza"] = "Parking se preklapa sa zgradom"
+    return rezultat
+
+
+def analiza_ml_zgrada_u_severnoj_zoni() -> gpd.GeoDataFrame:
+    """WITHIN: izdvoji cele ML zgrade unutar Severne zone, nezavisno od FK."""
+
+    zone = ucitaj_sloj_za_analizu("zone")
+    severna_zona = zone[zone["naziv"] == "Severna"]
+    if len(severna_zona) != 1:
+        raise RuntimeError("U bazi mora postojati tacno jedna Severna zona.")
+
+    ml_zgrade = ucitaj_sloj_za_analizu("ml_zgrade")
+    rezultat = ml_zgrade[
+        ml_zgrade.geometry.within(severna_zona.geometry.iloc[0])
+    ].copy()
+    rezultat["povrsina_m2"] = rezultat.geometry.area.round(2)
+    rezultat["analiza"] = "ML zgrada je potpuno u Severnoj zoni"
+    return rezultat
+
+
+def analiza_preseka_ml_i_evidentiranih_zgrada() -> gpd.GeoDataFrame:
+    """INTERSECTION: prikazi zajednicke povrsine ML i evidentiranih zgrada."""
+
+    ml_zgrade = ucitaj_sloj_za_analizu("ml_zgrade")
+    zgrade = ucitaj_sloj_za_analizu("zgrade")
+    # Poredimo geometrije bez rucnog povezivanja ID-eva iz dve tabele.
+    rezultat = gpd.overlay(
+        ml_zgrade[["ml_zgrada_id", "pouzdanost", "status_provere", "geometry"]],
+        zgrade[["zgrada_id", "naziv", "geometry"]],
+        how="intersection",
+        keep_geom_type=True,
+    )
+    rezultat["povrsina_preseka_m2"] = rezultat.geometry.area.round(2)
+    rezultat["analiza"] = "Presek ML i evidentirane zgrade"
     return rezultat

@@ -4,7 +4,8 @@ from contextlib import closing
 from typing import Any
 
 import pandas as pd
-from psycopg2 import sql
+from psycopg2 import Binary, sql
+from shapely.geometry.base import BaseGeometry
 
 from .database import povezi_se, ucitaj_tabele_u_dataframe
 
@@ -32,6 +33,10 @@ KONFIGURACIJA_TABELA = {
     "tereni": {
         "primarni_kljuc": "teren_id",
         "kolone": {"zona_id", "naziv", "povrsina_m2", "geometrija"},
+    },
+    "ml_zgrade": {
+        "primarni_kljuc": "ml_zgrada_id",
+        "kolone": {"status_provere"},
     },
 }
 
@@ -90,6 +95,103 @@ def dodaj_red(naziv_tabele: str, podaci: dict[str, Any]) -> int:
         konekcija.commit()
 
     return novi_id
+
+
+def dodaj_prostorni_red(
+    naziv_tabele: str,
+    podaci: dict[str, Any],
+    geometrija: BaseGeometry,
+) -> int:
+    """Dodaj red sa obaveznom geometrijom i automatski izracunatom povrsinom."""
+
+    konfiguracija = _proveri_tabelu(naziv_tabele)
+    _proveri_kolone(naziv_tabele, podaci)
+    automatske_kolone = {"povrsina_m2", "geometrija"}
+    if naziv_tabele != "zone_kampusa":
+        automatske_kolone.add("zona_id")
+    obavezne_kolone = konfiguracija["kolone"] - automatske_kolone
+    if set(podaci) != obavezne_kolone:
+        raise ValueError(
+            "Moraju biti prosledjene sve obavezne kolone: "
+            + ", ".join(sorted(obavezne_kolone))
+        )
+    if any(
+        vrednost is None or (isinstance(vrednost, str) and not vrednost.strip())
+        for vrednost in podaci.values()
+    ):
+        raise ValueError("Sve atributske kolone moraju biti popunjene.")
+    if geometrija is None or geometrija.is_empty or not geometrija.is_valid:
+        raise ValueError("Geometrija mora biti nacrtana i ispravna.")
+
+    ocekivani_tip = "Point" if naziv_tabele == "infrastrukturni_objekti" else "Polygon"
+    if geometrija.geom_type != ocekivani_tip:
+        raise ValueError(
+            f"Za tabelu '{naziv_tabele}' potrebna je geometrija {ocekivani_tip}."
+        )
+
+    vrednosti = dict(podaci)
+    if naziv_tabele != "zone_kampusa":
+        zona_id, _ = pronadji_zonu_za_geometriju(geometrija)
+        vrednosti["zona_id"] = zona_id
+    if "povrsina_m2" in konfiguracija["kolone"]:
+        vrednosti["povrsina_m2"] = round(geometrija.area, 2)
+
+    kolone = tuple(vrednosti)
+    geometrijski_izraz = (
+        sql.SQL("ST_Multi(ST_GeomFromWKB(%s, 32634))")
+        if naziv_tabele == "zgrade"
+        else sql.SQL("ST_GeomFromWKB(%s, 32634)")
+    )
+    upit = sql.SQL(
+        "INSERT INTO {} ({}, geometrija) VALUES ({}, {}) RETURNING {};"
+    ).format(
+        sql.Identifier(naziv_tabele),
+        sql.SQL(", ").join(map(sql.Identifier, kolone)),
+        sql.SQL(", ").join(sql.Placeholder() for _ in kolone),
+        geometrijski_izraz,
+        sql.Identifier(konfiguracija["primarni_kljuc"]),
+    )
+
+    with closing(povezi_se()) as konekcija:
+        with konekcija.cursor() as kursor:
+            kursor.execute(
+                upit,
+                (
+                    *tuple(vrednosti[kolona] for kolona in kolone),
+                    Binary(geometrija.wkb),
+                ),
+            )
+            novi_id = kursor.fetchone()[0]
+        konekcija.commit()
+
+    return novi_id
+
+
+def pronadji_zonu_za_geometriju(geometrija: BaseGeometry) -> tuple[int, str]:
+    """Pronadji jedinu zonu koja potpuno sadrzi prosledjenu geometriju."""
+
+    if geometrija is None or geometrija.is_empty or not geometrija.is_valid:
+        raise ValueError("Geometrija mora biti nacrtana i ispravna.")
+
+    with closing(povezi_se()) as konekcija, konekcija.cursor() as kursor:
+        kursor.execute(
+            """
+            SELECT zona_id, naziv
+            FROM zone_kampusa
+            WHERE geometrija IS NOT NULL
+              AND ST_Covers(geometrija, ST_GeomFromWKB(%s, 32634))
+            ORDER BY zona_id;
+            """,
+            (Binary(geometrija.wkb),),
+        )
+        zone = kursor.fetchall()
+
+    if not zone:
+        raise ValueError("Nacrtana geometrija mora biti potpuno unutar jedne zone.")
+    if len(zone) > 1:
+        raise ValueError("Geometrija ne sme istovremeno pripadati razlicitim zonama.")
+
+    return zone[0]
 
 
 def azuriraj_red(

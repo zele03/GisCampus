@@ -1,31 +1,46 @@
 """GisCampus aplikacija za pregled slojeva i CRUD rad sa podacima."""
 
+import json
+import re
 from warnings import catch_warnings, simplefilter
 
 import folium
 import geopandas as gpd
 import streamlit as st
-from branca.element import MacroElement, Template
+from branca.element import Element, MacroElement, Template
+from folium.plugins import Draw
+from psycopg2 import Error as PostgreSQLError
+from shapely.geometry import shape
 from streamlit_folium import st_folium
 
 from src.giscampus.geo.analysis import (
     analiza_buffera_infrastrukture,
     analiza_clip_zgrada,
     analiza_infrastrukture_u_centralnoj_zoni,
+    analiza_ml_zgrada_u_severnoj_zoni,
     analiza_preklapanja_parkinga_i_zgrada,
+    analiza_preseka_ml_i_evidentiranih_zgrada,
     analiza_preseka_parkinga_i_zelenila,
     analiza_slobodne_povrsine_kampusa,
     analiza_unije_parkinga_i_zelenila,
 )
 from src.giscampus.geo.data import OKVIR_KAMPUSA, preuzmi_raster_kampusa
 from src.giscampus.geo.map import _dodaj_raster
-from src.giscampus.sql.crud import azuriraj_red, dodaj_red, obrisi_red, prikazi_sve
+from src.giscampus.sql.crud import (
+    azuriraj_red,
+    dodaj_prostorni_red,
+    obrisi_red,
+    prikazi_sve,
+    pronadji_zonu_za_geometriju,
+)
 from src.giscampus.sql.database import povezi_se
 
 st.set_page_config(page_title="GisCampus", page_icon=":material/map:", layout="wide")
 
 SLOJEVI = {
     "Zone kampusa": {
+        "tabela": "zone_kampusa",
+        "id": "zona_id",
         "upit": """
             SELECT zona_id, naziv, oznaka, povrsina_m2,
                    ST_Transform(geometrija, 4326) AS geometrija
@@ -37,6 +52,8 @@ SLOJEVI = {
         "boja": "#00b7ff",
     },
     "Zgrade": {
+        "tabela": "zgrade",
+        "id": "zgrada_id",
         "upit": """
             SELECT zgrada_id, naziv, tip, povrsina_m2,
                    ST_Transform(geometrija, 4326) AS geometrija
@@ -48,6 +65,8 @@ SLOJEVI = {
         "boja": "#8e44ad",
     },
     "Parkiralista": {
+        "tabela": "parkiralista",
+        "id": "parkiraliste_id",
         "upit": """
             SELECT parkiraliste_id, naziv, tip, povrsina_m2,
                    ST_Transform(geometrija, 4326) AS geometrija
@@ -60,6 +79,8 @@ SLOJEVI = {
         "boja": "#ff3b30",
     },
     "Zelene povrsine": {
+        "tabela": "zelene_povrsine",
+        "id": "zelena_povrsina_id",
         "upit": """
             SELECT zelena_povrsina_id, tip, povrsina_m2,
                    ST_Transform(geometrija, 4326) AS geometrija
@@ -72,6 +93,8 @@ SLOJEVI = {
         "boja": "#00a651",
     },
     "Infrastrukturni objekti": {
+        "tabela": "infrastrukturni_objekti",
+        "id": "infrastrukturni_objekat_id",
         "upit": """
             SELECT infrastrukturni_objekat_id, naziv, stanje,
                    ST_Transform(geometrija, 4326) AS geometrija
@@ -84,6 +107,8 @@ SLOJEVI = {
         "boja": "#ff9500",
     },
     "Tereni": {
+        "tabela": "tereni",
+        "id": "teren_id",
         "upit": """
             SELECT teren_id, naziv, povrsina_m2,
                    ST_Transform(geometrija, 4326) AS geometrija
@@ -94,6 +119,32 @@ SLOJEVI = {
         "geometrija": "Polygon",
         "boja": "#ffd60a",
     },
+    "ML zgrade": {
+        "tabela": "ml_zgrade",
+        "id": "ml_zgrada_id",
+        "upit": """
+            SELECT ml_zgrada_id, zona_id, povrsina_m2, pouzdanost,
+                   status_provere,
+                   ST_Transform(geometrija, 4326) AS geometrija
+            FROM ml_zgrade
+            WHERE geometrija IS NOT NULL
+            ORDER BY ml_zgrada_id;
+        """,
+        "polja": [
+            "ml_zgrada_id",
+            "povrsina_m2",
+            "pouzdanost",
+            "status_provere",
+        ],
+        "nazivi_polja": [
+            "ML zgrada ID",
+            "Povrsina m2",
+            "Pouzdanost",
+            "Status provere",
+        ],
+        "geometrija": "Polygon",
+        "boja": "#00e5ff",
+    },
 }
 
 CRUD_TABELE = {
@@ -101,31 +152,51 @@ CRUD_TABELE = {
         "tabela": "zone_kampusa",
         "id": "zona_id",
         "kolone": ["naziv", "oznaka"],
+        "geometrija": "Polygon",
+        "ima_povrsinu": True,
     },
     "Zgrade": {
         "tabela": "zgrade",
         "id": "zgrada_id",
-        "kolone": ["zona_id", "naziv", "tip"],
+        "kolone": ["naziv", "tip"],
+        "geometrija": "Polygon",
+        "ima_povrsinu": True,
     },
     "Parkiralista": {
         "tabela": "parkiralista",
         "id": "parkiraliste_id",
-        "kolone": ["zona_id", "naziv", "tip"],
+        "kolone": ["naziv", "tip"],
+        "geometrija": "Polygon",
+        "ima_povrsinu": True,
     },
     "Zelene povrsine": {
         "tabela": "zelene_povrsine",
         "id": "zelena_povrsina_id",
-        "kolone": ["zona_id", "tip"],
+        "kolone": ["tip"],
+        "geometrija": "Polygon",
+        "ima_povrsinu": True,
     },
     "Infrastrukturni objekti": {
         "tabela": "infrastrukturni_objekti",
         "id": "infrastrukturni_objekat_id",
-        "kolone": ["zona_id", "naziv", "stanje"],
+        "kolone": ["naziv", "stanje"],
+        "geometrija": "Point",
+        "ima_povrsinu": False,
     },
     "Tereni": {
         "tabela": "tereni",
         "id": "teren_id",
-        "kolone": ["zona_id", "naziv"],
+        "kolone": ["naziv"],
+        "geometrija": "Polygon",
+        "ima_povrsinu": True,
+    },
+    "ML zgrade": {
+        "tabela": "ml_zgrade",
+        "id": "ml_zgrada_id",
+        "kolone": ["status_provere"],
+        "geometrija": "Polygon",
+        "ima_povrsinu": True,
+        "samo_status": True,
     },
 }
 
@@ -140,6 +211,10 @@ ANALIZE = {
         analiza_infrastrukture_u_centralnoj_zoni
     ),
     "Overlaps - parkinzi i zgrade": analiza_preklapanja_parkinga_i_zgrada,
+    "Within - ML zgrade u Severnoj zoni": analiza_ml_zgrada_u_severnoj_zoni,
+    "Intersection - ML i evidentirane zgrade": (
+        analiza_preseka_ml_i_evidentiranih_zgrada
+    ),
 }
 
 
@@ -159,31 +234,103 @@ def ucitaj_postgis_sloj(naziv_sloja: str) -> gpd.GeoDataFrame:
 
 def dodaj_postgis_slojeve(
     mapa: folium.Map,
-    prikazi_slojeve: bool = True,
+    vidljivi_slojevi: set[str] | None = None,
+    izabrani_objekat: dict | None = None,
 ) -> dict[str, folium.GeoJson]:
     """Dodaj PostGIS slojeve i odredi njihovu pocetnu vidljivost."""
 
+    if vidljivi_slojevi is None:
+        vidljivi_slojevi = set(SLOJEVI)
     folium_slojevi = {}
     for naziv, konfiguracija in SLOJEVI.items():
         podaci = ucitaj_postgis_sloj(naziv)
         boja = konfiguracija["boja"]
-        opcije = {
-            "name": naziv,
-            "show": prikazi_slojeve,
-            "style_function": lambda _, boja=boja: {
+        tabela = konfiguracija["tabela"]
+        id_kolona = konfiguracija["id"]
+        podaci = podaci.copy()
+        podaci["_gis_izbor"] = podaci[id_kolona].map(
+            lambda red_id, tabela=tabela: f"GIS_IZBOR:{tabela}:{int(red_id)}"
+        )
+
+        if konfiguracija["geometrija"] == "Point":
+            grupa = folium.FeatureGroup(
+                name=naziv,
+                show=naziv in vidljivi_slojevi,
+            ).add_to(mapa)
+            for _, red in podaci.iterrows():
+                red_id = int(red[id_kolona])
+                izabran = (
+                    izabrani_objekat is not None
+                    and izabrani_objekat["tabela"] == tabela
+                    and izabrani_objekat["id"] == red_id
+                )
+                klasa_pina = "gis-pin gis-pin--izabran" if izabran else "gis-pin"
+                sadrzaj_opisa = "<br>".join(
+                    f"<b>{oznaka}:</b> {red[polje]}"
+                    for polje, oznaka in zip(
+                        konfiguracija["polja"],
+                        konfiguracija["nazivi_polja"],
+                        strict=True,
+                    )
+                )
+                folium.Marker(
+                    location=[red.geometrija.y, red.geometrija.x],
+                    icon=folium.DivIcon(
+                        html=(
+                            f'<div class="{klasa_pina}" '
+                            f'style="--pin-color:{boja}"></div>'
+                        ),
+                        icon_size=(28, 34),
+                        icon_anchor=(14, 32),
+                        class_name="gis-pin-okvir",
+                    ),
+                    tooltip=folium.Tooltip(sadrzaj_opisa),
+                    popup=folium.Popup(f"GIS_IZBOR:{tabela}:{red_id}"),
+                ).add_to(grupa)
+            folium_slojevi[naziv] = grupa
+            continue
+
+        def stil_objekta(
+            objekat,
+            boja=boja,
+            tabela=tabela,
+            id_kolona=id_kolona,
+        ):
+            """Vrati osnovni ili naglaseni stil jednog objekta."""
+
+            izabran = (
+                izabrani_objekat is not None
+                and izabrani_objekat["tabela"] == tabela
+                and int(objekat["properties"][id_kolona])
+                == izabrani_objekat["id"]
+            )
+            if izabran:
+                return {
+                    "color": "#ffff00",
+                    "weight": 7,
+                    "fillColor": "#ffff00",
+                    "fillOpacity": 0.55,
+                }
+            return {
                 "color": boja,
                 "weight": 3,
                 "fillColor": boja,
                 "fillOpacity": 0.25,
-            },
+            }
+
+        opcije = {
+            "name": naziv,
+            "show": naziv in vidljivi_slojevi,
+            "style_function": stil_objekta,
             "tooltip": folium.GeoJsonTooltip(
                 fields=konfiguracija["polja"],
                 aliases=konfiguracija["nazivi_polja"],
             ),
+            "popup": folium.GeoJsonPopup(
+                fields=["_gis_izbor"],
+                aliases=["Izabrani objekat"],
+            ),
         }
-        if konfiguracija["geometrija"] == "Point":
-            opcije["marker"] = folium.CircleMarker(radius=7)
-
         folium_slojevi[naziv] = folium.GeoJson(podaci, **opcije).add_to(mapa)
 
     return folium_slojevi
@@ -279,6 +426,15 @@ class KontrolaSimbologije(MacroElement):
                     fillOpacity: stil.providnost,
                     weight: stil.debljina
                 });
+                gisSlojevi[izbor.value].eachLayer(function(objekat) {
+                    const element = objekat.getElement ? objekat.getElement() : null;
+                    const pin = element ? element.querySelector(".gis-pin") : null;
+                    if (pin) {
+                        pin.style.setProperty("--pin-color", stil.boja);
+                        pin.style.opacity = stil.providnost;
+                        pin.style.borderWidth = stil.debljina + "px";
+                    }
+                });
             }
 
             dugme.addEventListener("click", function() {
@@ -305,11 +461,108 @@ class KontrolaSimbologije(MacroElement):
         self.stilovi = {
             naziv: {
                 "boja": SLOJEVI[naziv]["boja"],
-                "providnost": 0.25,
+                "providnost": (
+                    1.0 if SLOJEVI[naziv]["geometrija"] == "Point" else 0.25
+                ),
                 "debljina": 3,
             }
             for naziv in slojevi
         }
+
+
+class IskljuciProzoreObjekata(MacroElement):
+    """Zadrzi podatak o kliku, ali ne otvaraj Leaflet popup."""
+
+    _template = Template(
+        """
+        {% macro script(this, kwargs) %}
+        {% for sloj in this.slojevi.values() %}
+        {{ sloj.get_name() }}.eachLayer(function(objekat) {
+            if (objekat.getPopup && objekat.getPopup()) {
+                objekat.off("click", objekat._openPopup, objekat);
+            }
+        });
+        {% endfor %}
+        {% endmacro %}
+        """
+    )
+
+    def __init__(self, slojevi: dict[str, folium.GeoJson]) -> None:
+        super().__init__()
+        self._name = "IskljuciProzoreObjekata"
+        self.slojevi = slojevi
+
+
+class KontrolaIzboraISlojeva(MacroElement):
+    """Posalji Streamlit-u vidljive slojeve i omoguci brisanje izbora."""
+
+    _template = Template(
+        """
+        {% macro script(this, kwargs) %}
+        const gisSlojeviZaPracenje = {
+            {% for naziv, sloj in this.slojevi.items() %}
+            {{ naziv|tojson }}: {{ sloj.get_name() }},
+            {% endfor %}
+        };
+        const gisSignal = document.createElement("div");
+        const gisSignalMarker = L.marker(
+            {{ this.lokacija|tojson }},
+            {opacity: 0, interactive: false, keyboard: false}
+        ).bindPopup(gisSignal).addTo({{ this._parent.get_name() }});
+        gisSignalMarker.off("click", gisSignalMarker._openPopup, gisSignalMarker);
+
+        function posaljiVidljiveSlojeve() {
+            const vidljivi = Object.entries(gisSlojeviZaPracenje)
+                .filter(function(par) {
+                    return {{ this._parent.get_name() }}.hasLayer(par[1]);
+                })
+                .map(function(par) { return par[0]; });
+            gisSignal.textContent = "GIS_SLOJEVI:" + JSON.stringify(vidljivi);
+            gisSignalMarker.fire("click");
+        }
+
+        {{ this._parent.get_name() }}.on("overlayadd", posaljiVidljiveSlojeve);
+        {{ this._parent.get_name() }}.on("overlayremove", posaljiVidljiveSlojeve);
+
+        {% if this.ima_izbor %}
+        const kontrolaIzbora = L.control({position: "topright"});
+        kontrolaIzbora.onAdd = function() {
+            const okvir = L.DomUtil.create("div", "leaflet-bar");
+            const dugme = L.DomUtil.create("button", "", okvir);
+            dugme.type = "button";
+            dugme.title = "Obrisi izbor objekta";
+            dugme.textContent = "Obrisi izbor";
+            dugme.style.height = "30px";
+            dugme.style.padding = "0 10px";
+            dugme.style.border = "0";
+            dugme.style.background = "white";
+            dugme.style.color = "#202124";
+            dugme.style.cursor = "pointer";
+            dugme.style.fontWeight = "600";
+            dugme.addEventListener("click", function() {
+                gisSignal.textContent = "GIS_OBRISI_IZBOR";
+                gisSignalMarker.fire("click");
+            });
+            L.DomEvent.disableClickPropagation(okvir);
+            return okvir;
+        };
+        kontrolaIzbora.addTo({{ this._parent.get_name() }});
+        {% endif %}
+        {% endmacro %}
+        """
+    )
+
+    def __init__(
+        self,
+        slojevi: dict[str, folium.GeoJson],
+        lokacija: list[float],
+        ima_izbor: bool,
+    ) -> None:
+        super().__init__()
+        self._name = "KontrolaIzboraISlojeva"
+        self.slojevi = slojevi
+        self.lokacija = lokacija
+        self.ima_izbor = ima_izbor
 
 
 @st.cache_data(ttl="5m", max_entries=10)
@@ -355,6 +608,10 @@ def dodaj_rezultat_analize(
 def napravi_mapu(
     naziv_analize: str = "Bez analize",
     rezultat_analize: gpd.GeoDataFrame | None = None,
+    geometrija_za_crtanje: str | None = None,
+    sacuvana_geometrija=None,
+    izabrani_objekat: dict | None = None,
+    vidljivi_slojevi: set[str] | None = None,
 ) -> folium.Map:
     """Napravi zavrsnu mapu sa rasterom i svim PostGIS slojevima."""
 
@@ -365,12 +622,94 @@ def napravi_mapu(
         tiles=None,
         control_scale=False,
     )
+    mapa.get_root().header.add_child(
+        Element(
+            """
+            <style>
+            .leaflet-interactive:focus { outline: none !important; }
+            .gis-pin-okvir {
+                background: transparent !important;
+                border: 0 !important;
+            }
+            .gis-pin {
+                width: 24px;
+                height: 24px;
+                background: var(--pin-color);
+                border: 3px solid white;
+                border-radius: 50% 50% 50% 0;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
+                transform: rotate(-45deg);
+            }
+            .gis-pin::after {
+                content: "";
+                position: absolute;
+                width: 7px;
+                height: 7px;
+                top: 6px;
+                left: 6px;
+                background: white;
+                border-radius: 50%;
+            }
+            .gis-pin--izabran {
+                background: #ffff00 !important;
+                border-color: #111111 !important;
+                transform: rotate(-45deg) scale(1.25);
+            }
+            </style>
+            """
+        )
+    )
     _dodaj_raster(mapa, preuzmi_raster_kampusa())
-    prikazi_osnovne_slojeve = naziv_analize == "Bez analize"
-    slojevi = dodaj_postgis_slojeve(mapa, prikazi_osnovne_slojeve)
+    if vidljivi_slojevi is None:
+        vidljivi_slojevi = set(SLOJEVI) if naziv_analize == "Bez analize" else set()
+    slojevi = dodaj_postgis_slojeve(
+        mapa,
+        vidljivi_slojevi,
+        izabrani_objekat,
+    )
+    IskljuciProzoreObjekata(slojevi).add_to(mapa)
     KontrolaSimbologije(slojevi).add_to(mapa)
+    KontrolaIzboraISlojeva(
+        slojevi,
+        [(min_y + max_y) / 2, (min_x + max_x) / 2],
+        izabrani_objekat is not None,
+    ).add_to(mapa)
     if rezultat_analize is not None:
         dodaj_rezultat_analize(mapa, naziv_analize, rezultat_analize)
+    if sacuvana_geometrija is not None:
+        nacrtani_sloj = gpd.GeoDataFrame(
+            [{"naziv": "Nova geometrija", "geometry": sacuvana_geometrija}],
+            geometry="geometry",
+            crs="EPSG:32634",
+        ).to_crs(4326)
+        folium.GeoJson(
+            nacrtani_sloj,
+            name="Nova geometrija",
+            style_function=lambda _: {
+                "color": "#ff00c8",
+                "weight": 4,
+                "fillColor": "#ff00c8",
+                "fillOpacity": 0.3,
+            },
+            marker=folium.CircleMarker(radius=8),
+        ).add_to(mapa)
+    if geometrija_za_crtanje is not None:
+        Draw(
+            export=False,
+            draw_options={
+                "polyline": False,
+                "rectangle": False,
+                "circle": False,
+                "circlemarker": False,
+                "marker": geometrija_za_crtanje == "Point",
+                "polygon": (
+                    {"allowIntersection": False, "showArea": True}
+                    if geometrija_za_crtanje == "Polygon"
+                    else False
+                ),
+            },
+            edit_options={"edit": True, "remove": True},
+        ).add_to(mapa)
     folium.LayerControl(position="topright", collapsed=False).add_to(mapa)
     mapa.fit_bounds([[min_y, min_x], [max_y, max_x]])
     return mapa
@@ -417,58 +756,261 @@ def osvezi_podatke() -> None:
     """Ocisti kes nakon CRUD izmene da mapa odmah prikaze novo stanje."""
 
     ucitaj_postgis_sloj.clear()
+    pokreni_analizu.clear()
 
 
-def prikazi_crud() -> None:
-    """Prikazi CRUD kontrole za sve projektne tabele u bocnoj traci."""
+def procitaj_izbor_sa_mape(sadrzaj: str | None) -> dict | None:
+    """Procitaj naziv tabele i ID iz sadrzaja kliknutog objekta."""
+
+    if not sadrzaj:
+        return None
+    poklapanje = re.search(r"GIS_IZBOR:([a-z_]+):(\d+)", sadrzaj)
+    if poklapanje is None:
+        return None
+    return {
+        "tabela": poklapanje.group(1),
+        "id": int(poklapanje.group(2)),
+    }
+
+
+def procitaj_vidljive_slojeve(sadrzaj: str | None) -> set[str] | None:
+    """Procitaj spisak ukljucenih projektnih slojeva koji je poslala mapa."""
+
+    if not sadrzaj or not sadrzaj.startswith("GIS_SLOJEVI:"):
+        return None
+    try:
+        nazivi = json.loads(sadrzaj.removeprefix("GIS_SLOJEVI:"))
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(nazivi, list):
+        return None
+    return {naziv for naziv in nazivi if naziv in SLOJEVI}
+
+
+def obradi_stanje_mape(kljuc_mape: str, dozvoli_izbor: bool = True) -> None:
+    """Sacuvaj dogadjaj mape pre ponovnog iscrtavanja CRUD kontrola."""
+
+    rezultat = st.session_state.get(kljuc_mape, {})
+    sadrzaj = rezultat.get("last_object_clicked_popup")
+    slojevi = procitaj_vidljive_slojeve(sadrzaj)
+    if slojevi is not None:
+        st.session_state["vidljivi_slojevi"] = sorted(slojevi)
+    elif dozvoli_izbor and sadrzaj == "GIS_OBRISI_IZBOR":
+        st.session_state.pop("izabrani_objekat", None)
+    elif dozvoli_izbor:
+        izbor = procitaj_izbor_sa_mape(sadrzaj)
+        if izbor is not None:
+            st.session_state["izabrani_objekat"] = izbor
+
+
+def promeni_analizu_slojeva() -> None:
+    """Promeni pocetne slojeve samo pri eksplicitnom izboru analize."""
+
+    naziv = st.session_state["izabrana_prostorna_analiza"]
+    st.session_state["vidljivi_slojevi"] = (
+        list(SLOJEVI) if naziv == "Bez analize" else []
+    )
+
+
+def stil_izabranog_reda(red, tabela: str, id_kolona: str):
+    """Istakni red koji odgovara trenutno izabranom objektu."""
+
+    izabrani = st.session_state.get("izabrani_objekat")
+    if (
+        izabrani is not None
+        and izabrani["tabela"] == tabela
+        and int(red[id_kolona]) == izabrani["id"]
+    ):
+        return [
+            "background-color: #ffff00; color: #111111; font-weight: 700"
+            for _ in red
+        ]
+    return ["" for _ in red]
+
+
+def prikazi_crud() -> dict:
+    """Prikazi CRUD kontrole i vrati trenutno stanje izabrane operacije."""
 
     st.subheader("Upravljanje podacima")
+    if st.session_state.pop("prikazi_tabelu_nakon_dodavanja", False):
+        st.session_state["crud_operacija"] = "Prikaz"
+    poruka = st.session_state.pop("crud_poruka", None)
+    if poruka:
+        st.success(poruka)
+
     naziv_tabele = st.selectbox("Tabela", list(CRUD_TABELE), key="crud_tabela")
+    konfiguracija = CRUD_TABELE[naziv_tabele]
+    tabela = konfiguracija["tabela"]
+    opcije_operacija = (
+        ["Prikaz", "Promeni status"]
+        if konfiguracija.get("samo_status")
+        else ["Prikaz", "Dodaj", "Izmeni", "Obrisi"]
+    )
+    if st.session_state.get("crud_operacija") not in (None, *opcije_operacija):
+        st.session_state["crud_operacija"] = "Prikaz"
     operacija = st.segmented_control(
         "Operacija",
-        ["Prikaz", "Dodaj", "Izmeni", "Obrisi"],
+        opcije_operacija,
         default="Prikaz",
         key="crud_operacija",
     )
-    konfiguracija = CRUD_TABELE[naziv_tabele]
-    tabela = konfiguracija["tabela"]
     id_kolona = konfiguracija["id"]
     podaci = prikazi_sve(tabela)
+    stanje = {
+        "operacija": operacija,
+        "naziv_tabele": naziv_tabele,
+        "tabela": tabela,
+        "konfiguracija": konfiguracija,
+    }
 
     if operacija == "Prikaz":
         kolone = [kolona for kolona in podaci.columns if kolona != "geometrija"]
-        st.dataframe(podaci[kolone], hide_index=True, height=260)
-        return
+        prikaz = podaci[kolone].reset_index(drop=True)
+        stilizovan_prikaz = prikaz.style.apply(
+            stil_izabranog_reda,
+            axis=1,
+            tabela=tabela,
+            id_kolona=id_kolona,
+        )
+        izabrani = st.session_state.get("izabrani_objekat")
+        podrazumevani_redovi = []
+        if izabrani is not None and izabrani["tabela"] == tabela:
+            indeksi = prikaz.index[prikaz[id_kolona] == izabrani["id"]].tolist()
+            podrazumevani_redovi = indeksi[:1]
+        oznaka_izbora = (
+            str(izabrani["id"])
+            if izabrani is not None and izabrani["tabela"] == tabela
+            else "bez"
+        )
+        dogadjaj = st.dataframe(
+            stilizovan_prikaz,
+            hide_index=True,
+            height=260,
+            on_select="rerun",
+            selection_mode="single-row",
+            selection_default={"selection": {"rows": podrazumevani_redovi}},
+            key=f"crud_prikaz_{tabela}_{oznaka_izbora}",
+        )
+        izabrani_redovi = tuple(dogadjaj.selection.rows)
+        if izabrani_redovi:
+            red = prikaz.iloc[izabrani_redovi[0]]
+            novi_izbor = {
+                "tabela": tabela,
+                "id": int(red[id_kolona]),
+            }
+            if novi_izbor != izabrani:
+                st.session_state["izabrani_objekat"] = novi_izbor
+                st.rerun()
+        elif izabrani is not None and izabrani["tabela"] == tabela:
+            st.session_state.pop("izabrani_objekat", None)
+            st.rerun()
+        return stanje
 
     if operacija == "Dodaj":
-        with st.form(f"dodaj_{tabela}"):
-            novi_podaci = {
-                kolona: polje_za_vrednost(kolona, f"dodaj_{tabela}_{kolona}")
-                for kolona in konfiguracija["kolone"]
+        st.caption("Sve vrednosti su obavezne.")
+        novi_podaci = {
+            kolona: polje_za_vrednost(kolona, f"dodaj_{tabela}_{kolona}")
+            for kolona in konfiguracija["kolone"]
+        }
+        atributi_popunjeni = all(
+            vrednost is not None
+            and (not isinstance(vrednost, str) or bool(vrednost.strip()))
+            for vrednost in novi_podaci.values()
+        )
+        kljuc_geometrije = f"nova_geometrija_{tabela}"
+        if kljuc_geometrije in st.session_state:
+            st.success("Geometrija je nacrtana.")
+        else:
+            st.info("Nacrtaj geometriju na mapi.")
+        stanje.update(
+            {
+                "novi_podaci": novi_podaci,
+                "atributi_popunjeni": atributi_popunjeni,
+                "kljuc_geometrije": kljuc_geometrije,
             }
-            potvrda = st.form_submit_button(
-                "Dodaj red", type="primary", icon=":material/add:"
-            )
-        if potvrda:
-            try:
-                novi_id = dodaj_red(tabela, novi_podaci)
-                osvezi_podatke()
-                st.success(f"Dodat je red sa ID {novi_id}.")
-            except Exception as greska:
-                st.error(f"Red nije dodat: {greska}")
-        return
+        )
+        return stanje
 
     if podaci.empty:
         st.info("Izabrana tabela nema redove.")
-        return
+        return stanje
 
     redovi_po_id = podaci.set_index(id_kolona)
+    id_vrednosti = redovi_po_id.index.tolist()
+    izabrani_objekat = st.session_state.get("izabrani_objekat")
+    podrazumevani_indeks = 0
+    if (
+        izabrani_objekat is not None
+        and izabrani_objekat["tabela"] == tabela
+        and izabrani_objekat["id"] in id_vrednosti
+    ):
+        podrazumevani_indeks = id_vrednosti.index(izabrani_objekat["id"])
+
+    def opis_reda(red_id):
+        """Prikazi vise korisnih podataka pri izboru ML zgrade."""
+
+        if tabela != "ml_zgrade":
+            return f"ID {red_id}"
+        red = redovi_po_id.loc[red_id]
+        return (
+            f"ID {red_id} | zona {int(red['zona_id'])} | "
+            f"{float(red['povrsina_m2']):.2f} m2 | "
+            f"{float(red['pouzdanost']) * 100:.1f}%"
+        )
+
+    kljuc_reda = f"crud_red_{tabela}"
+    prvi_izbor_reda = kljuc_reda not in st.session_state
+
+    def oznaci_ml_zgradu_za_proveru():
+        """Odmah oznaci ML zgradu izabranu za proveru statusa."""
+
+        red_id = st.session_state[kljuc_reda]
+        if red_id in id_vrednosti:
+            st.session_state["izabrani_objekat"] = {
+                "tabela": tabela,
+                "id": int(red_id),
+            }
+
     izabrani_id = st.selectbox(
         "Red",
-        redovi_po_id.index.tolist(),
-        format_func=lambda red_id: f"ID {red_id}",
-        key=f"crud_red_{tabela}",
+        id_vrednosti,
+        index=podrazumevani_indeks,
+        format_func=opis_reda,
+        key=kljuc_reda,
+        on_change=(
+            oznaci_ml_zgradu_za_proveru if operacija == "Promeni status" else None
+        ),
     )
+
+    if operacija == "Promeni status":
+        # Oznaci i pocetni red; kasnije promene obradjuje callback iznad.
+        if prvi_izbor_reda:
+            oznaci_ml_zgradu_za_proveru()
+        trenutni_status = redovi_po_id.loc[izabrani_id, "status_provere"]
+        statusi = ["nije_potvrdjeno", "potvrdjeno", "odbijeno"]
+        with st.form(f"promeni_status_{izabrani_id}"):
+            novi_status = st.selectbox(
+                "Status provere",
+                statusi,
+                index=statusi.index(trenutni_status),
+            )
+            potvrda = st.form_submit_button(
+                "Sacuvaj status",
+                type="primary",
+                icon=":material/verified:",
+            )
+        if potvrda:
+            try:
+                azuriraj_red(
+                    "ml_zgrade",
+                    int(izabrani_id),
+                    {"status_provere": novi_status},
+                )
+                osvezi_podatke()
+                st.success("Status ML zgrade je sacuvan.")
+            except (ValueError, PostgreSQLError) as greska:
+                st.error(f"Status nije sacuvan: {greska}")
+        return stanje
 
     if operacija == "Izmeni":
         kolona = st.selectbox(
@@ -491,9 +1033,9 @@ def prikazi_crud() -> None:
                 azuriraj_red(tabela, int(izabrani_id), {kolona: nova_vrednost})
                 osvezi_podatke()
                 st.success("Red je izmenjen.")
-            except Exception as greska:
+            except (ValueError, PostgreSQLError) as greska:
                 st.error(f"Red nije izmenjen: {greska}")
-        return
+        return stanje
 
     st.warning(f"Bice obrisan red sa ID {izabrani_id}.")
     potvrda_brisanja = st.checkbox("Potvrdjujem brisanje")
@@ -506,32 +1048,134 @@ def prikazi_crud() -> None:
             obrisi_red(tabela, int(izabrani_id))
             osvezi_podatke()
             st.success("Red je obrisan.")
-        except Exception as greska:
+        except (ValueError, PostgreSQLError) as greska:
             st.error(f"Red nije obrisan: {greska}")
 
+    return stanje
+
+
+st.session_state.setdefault("vidljivi_slojevi", list(SLOJEVI))
 
 with st.sidebar:
     st.header("GisCampus")
-    prikazi_crud()
-    st.divider()
-    st.subheader("Prostorne analize")
-    izabrana_analiza = st.selectbox(
-        "Analiza",
-        list(ANALIZE),
-        key="izabrana_prostorna_analiza",
-    )
+    crud_stanje = prikazi_crud()
+    if crud_stanje["operacija"] != "Dodaj":
+        st.divider()
+        st.subheader("Prostorne analize")
+        izabrana_analiza = st.selectbox(
+            "Analiza",
+            list(ANALIZE),
+            key="izabrana_prostorna_analiza",
+            persist_state="session",
+            on_change=promeni_analizu_slojeva,
+        )
+    else:
+        izabrana_analiza = "Bez analize"
 
 st.title("GisCampus")
 rezultat_analize = pokreni_analizu(izabrana_analiza)
-st_folium(
-    napravi_mapu(izabrana_analiza, rezultat_analize),
-    width=1000,
-    height=560,
-    key="gis_kampus_mapa",
-    returned_objects=[],
-)
 
-if izabrana_analiza != "Bez analize":
+vidljivi_slojevi = set(st.session_state["vidljivi_slojevi"])
+
+if crud_stanje["operacija"] == "Dodaj":
+    konfiguracija = crud_stanje["konfiguracija"]
+    tabela = crud_stanje["tabela"]
+    st.subheader(f"Dodavanje: {crud_stanje['naziv_tabele']}")
+    st.write(
+        "Popuni obavezne atribute u bocnoj traci, a zatim nacrtaj "
+        "objekat na mapi."
+    )
+    postojeca_geometrija = st.session_state.get(crud_stanje["kljuc_geometrije"])
+    kljuc_mape_za_dodavanje = f"dodavanje_geometrije_{tabela}"
+    rezultat_mape = st_folium(
+        napravi_mapu(
+            geometrija_za_crtanje=konfiguracija["geometrija"],
+            sacuvana_geometrija=postojeca_geometrija,
+            vidljivi_slojevi=vidljivi_slojevi,
+        ),
+        width=1000,
+        height=560,
+        key=kljuc_mape_za_dodavanje,
+        returned_objects=[
+            "all_drawings",
+            "last_object_clicked_popup",
+            "last_object_clicked_count",
+        ],
+        on_change=lambda: obradi_stanje_mape(kljuc_mape_za_dodavanje, False),
+    )
+    crtezi = rezultat_mape.get("all_drawings")
+    if crtezi:
+        nacrtana = shape(crtezi[-1]["geometry"])
+        if nacrtana.geom_type != konfiguracija["geometrija"]:
+            st.error(f"Potrebno je nacrtati geometriju {konfiguracija['geometrija']}.")
+            st.session_state.pop(crud_stanje["kljuc_geometrije"], None)
+        elif not nacrtana.is_valid:
+            st.error("Nacrtana geometrija nije ispravna.")
+            st.session_state.pop(crud_stanje["kljuc_geometrije"], None)
+        else:
+            geometrija_m = gpd.GeoSeries([nacrtana], crs=4326).to_crs(32634).iloc[0]
+            st.session_state[crud_stanje["kljuc_geometrije"]] = geometrija_m
+
+    geometrija = st.session_state.get(crud_stanje["kljuc_geometrije"])
+    zona_je_ispravna = True
+    if geometrija is not None:
+        if konfiguracija["ima_povrsinu"]:
+            st.metric("Automatski izracunata povrsina", f"{geometrija.area:.2f} m2")
+        else:
+            st.success("Tacka infrastrukturnog objekta je spremna.")
+        if tabela != "zone_kampusa":
+            try:
+                zona_id, naziv_zone = pronadji_zonu_za_geometriju(geometrija)
+                st.success(f"Automatski dodeljena zona: {naziv_zone} (ID {zona_id}).")
+            except ValueError as greska:
+                zona_je_ispravna = False
+                st.error(str(greska))
+
+    spremno_za_upis = (
+        crud_stanje["atributi_popunjeni"]
+        and geometrija is not None
+        and zona_je_ispravna
+    )
+    if st.button(
+        "Dodaj objekat u bazu",
+        type="primary",
+        icon=":material/add_location_alt:",
+        disabled=not spremno_za_upis,
+    ):
+        try:
+            novi_id = dodaj_prostorni_red(
+                tabela,
+                crud_stanje["novi_podaci"],
+                geometrija,
+            )
+            st.session_state.pop(crud_stanje["kljuc_geometrije"], None)
+            osvezi_podatke()
+            pokreni_analizu.clear()
+            st.session_state["crud_poruka"] = f"Dodat je objekat sa ID {novi_id}."
+            st.session_state["prikazi_tabelu_nakon_dodavanja"] = True
+            st.rerun()
+        except (ValueError, PostgreSQLError) as greska:
+            st.error(f"Objekat nije dodat: {greska}")
+else:
+    izabrani_objekat = st.session_state.get("izabrani_objekat")
+    rezultat_mape = st_folium(
+        napravi_mapu(
+            izabrana_analiza,
+            rezultat_analize,
+            izabrani_objekat=izabrani_objekat,
+            vidljivi_slojevi=vidljivi_slojevi,
+        ),
+        width=1000,
+        height=560,
+        key="gis_kampus_mapa",
+        returned_objects=[
+            "last_object_clicked_popup",
+            "last_object_clicked_count",
+        ],
+        on_change=lambda: obradi_stanje_mape("gis_kampus_mapa"),
+    )
+
+if crud_stanje["operacija"] != "Dodaj" and izabrana_analiza != "Bez analize":
     st.subheader("Rezultat prostorne analize")
     if rezultat_analize.empty:
         st.info("Analiza je uspesno izvrsena, ali nije pronadjen nijedan rezultat.")

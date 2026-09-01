@@ -1,148 +1,163 @@
 # GisCampus
 
-Studentski projekat iz predmeta **Osnove geoinformatike**.
+Studentski projekat iz predmeta **Osnove geoinformatike**. Aplikacija objedinjuje PostgreSQL/PostGIS bazu, prostorne podatke, interaktivnu mapu i ML segmentaciju zgrada za univerzitetski kampus u Novom Sadu.
 
-GisCampus je GIS aplikacija za upravljanje infrastrukturom univerzitetskog
-kampusa. Projekat ce objediniti PostgreSQL/PostGIS bazu, obradu prostornih
-podataka u Pythonu i automatsko izdvajanje zgrada sa ortofoto snimaka pomocu
-masinskog ucenja.
+## Šta projekat sadrži
 
-## Planirane celine
+- sedam PostGIS tabela sa atributima i geometrijama;
+- CRUD operacije i SQL JOIN/WHERE upite;
+- ručno evidentirane zone, zgrade, parkirališta, zelene površine, infrastrukturne objekte i terene;
+- raster kampusa i devet prostornih analiza;
+- već istrenirani U-Net sa ResNet34 enkoderom za izdvajanje zgrada;
+- Streamlit aplikaciju sa Folium/Leaflet mapom;
+- rezervnu kopiju trenutne baze za prenos na drugi računar.
 
-1. PostgreSQL/PostGIS baza i CRUD operacije iz Pythona
-2. Ucitavanje, povezivanje i analiza vektorskih i rasterskih podataka
-3. ML izdvajanje zgrada i cuvanje rezultata u PostGIS bazi
-4. Interaktivni GIS interfejs
+## Preduslovi
 
-## Trenutni status
+Projekat je proveren sa Windows 10/11, Python 3.12, PostgreSQL 17 i PostGIS 3.6. PostgreSQL instalacija mora sadržati alate `pg_dump` i `pg_restore`. Za preuzimanje rastera i težina modela potrebna je internet veza.
 
-Postavljeno je lokalno Python 3.12 virtuelno okruzenje i kompletna pocetna
-struktura projekta. Ostvarena je konekcija sa PostgreSQL serverom i pripremljeno
-je automatsko kreiranje projektne baze `gis_kampus` sa PostGIS ekstenzijom.
-Definisano je sest povezanih tabela za zone, zgrade, parkiralista, zelene
-povrsine, infrastrukturne objekte i sportske terene. Pripremljen je rucni unos
-pocetnih podataka SQL `INSERT` naredbama, sa najmanje pet redova u svakoj
-tabeli. Podaci iz svih sest tabela ucitavaju se u zasebne pandas DataFrame
-objekte. Obezbedjene su opste CRUD operacije za prikaz, dodavanje, azuriranje i
-brisanje redova u svih sest tabela. Dodato je sedam SQL upita koji povezuju dve
-ili tri tabele pomocu `JOIN` i filtriraju podatke pomocu `WHERE`. Povrsine i
-geometrije bice dopunjene u GEO delu projekta.
+## Postavljanje na novom računaru
 
-Za GEO deo koristi se Geofabrik SHP paket sa OpenStreetMap podacima za Srbiju.
-Originalna arhiva i raspakovani slojevi cuvaju se lokalno u
-`data/raw/vector/` i ne postavljaju se na GitHub. Pet relevantnih SHP slojeva
-ucitava se pomocu GeoPandas biblioteke samo za okvir kampusa, a njihove
-informacije se zatim pretvaraju u zasebne pandas DataFrame objekte uz zadrzanu
-kolonu `geometry`.
-
-Preuzet je Esri World Imagery raster za tacan okvir kampusa i sacuvan kao
-georeferencirani TIFF u `data/raw/raster/`. Pripremljena je interaktivna HTML
-mapa za proveru OSM poligona svih evidentiranih zgrada. Zgrade mogu imati
-`MultiPolygon` geometriju, studentski domovi nose stvarne nazive, a za Rektorat
-je izabrana samo centralna zgrada. OSM poligoni su povezani sa 14 redova tabele
-`zgrade` preko pomocnog Python mapiranja naziva i `osm_id` vrednosti. Geometrije
-su upisane u PostGIS u EPSG:32634, zajedno sa izracunatim povrsinama.
-
-Dodat je prvi interaktivni ekran aplikacije za rucno crtanje okvira celog
-kampusa i pet zona preko rastera. Rucno nacrtane zone su prostorno ociscene:
-odseceni su delovi van okvira, uklonjena su preklapanja i popunjene su male
-praznine. Konacni rezultat je sacuvan u
-`data/processed/campus/zone.geojson`, dok je prvobitni crtez uklonjen.
-Ocisceni poligoni su povezani sa pet postojecih redova tabele `zone_kampusa` i
-upisani u PostGIS u EPSG:32634, zajedno sa izracunatim povrsinama.
-Strani kljucevi zgrada provereni su u odnosu na nacrtane zone; FTN ostaje u
-Centralnoj, a Ekonomski fakultet pripada Zapadnoj zoni.
-Tabela `parkiralista` dopunjena je jedinstvenom kolonom `naziv`, sa vrednostima
-od `parkiraliste_1` do `parkiraliste_12`, radi jednostavnog povezivanja sa
-rucno nacrtanim poligonima. Interaktivni ekran sada omogucava izbor jednog od
-12 redova iz baze i cuvanje nacrtanog poligona u
-`data/processed/campus/parkiralista.geojson`. Svih 12 poligona povezano je sa
-tabelom `parkiralista` preko `parkiraliste_id` i naziva, a geometrije i
-izracunate povrsine upisane su u PostGIS u EPSG:32634.
-Interaktivni ekran je zatim prilagodjen za crtanje pet redova iz tabele
-`zelene_povrsine`. Kao opcioni referentni sloj prikazuju se objekti klasa
-`park`, `grass` i `forest` iz vec preuzetog SHP sloja namene zemljista, dok se
-rucni crtezi cuvaju u `data/processed/campus/zelene_povrsine.geojson`. Svih pet
-poligona povezano je sa tabelom `zelene_povrsine` preko primarnog kljuca i tipa,
-a geometrije i izracunate povrsine upisane su u PostGIS u EPSG:32634.
-Infrastrukturni objekti su rucno evidentirani kao tacke i sacuvani u
-`data/processed/campus/infrastrukturni_objekti.geojson`. Svih sest tacaka
-povezano je sa tabelom `infrastrukturni_objekti` preko primarnog kljuca i naziva,
-a geometrije su upisane u PostGIS u EPSG:32634. Osam `pitch` poligona iz
-Geofabrik SHP sloja rucno je upareno sa odgovarajucim terenima pre upisa u
-PostGIS.
-
-## Lokalno pokretanje
-
-U PowerShell terminalu aktivirati virtuelno okruzenje:
+### 1. Preuzimanje projekta
 
 ```powershell
+git clone <URL_REPOZITORIJUMA>
+cd GisCampus
+```
+
+### 2. Python okruženje
+
+```powershell
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-Proveriti aktivnu verziju Pythona:
-
-```powershell
-python --version
-```
-
-Ocekivana verzija je Python 3.12.
-
-Instalirati trenutno potrebne biblioteke:
-
-```powershell
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-Proveriti konekciju i pripremiti projektnu bazu:
+`requirements.txt` sadrži verzije biblioteka iz proverenog okruženja.
+
+### 3. Podešavanje baze
+
+```powershell
+Copy-Item .env.example .env
+```
+
+U `.env` zatim treba upisati podatke lokalnog PostgreSQL servera:
+
+```text
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=gis_kampus
+DB_USER=postgres
+DB_PASSWORD=vaša_lozinka
+```
+
+`.env` sadrži lozinku i zato se ne postavlja na GitHub.
+
+### 4. Obnavljanje projektne baze
+
+Repozitorijum sadrži `data/backup/gis_kampus.backup` sa sedam tabela, ključevima, geometrijama, ML rezultatima i statusima provere. Obnavljanje zamenjuje projektne tabele u bazi navedenoj u `.env`, pa zahteva izričitu potvrdu:
+
+```powershell
+.\scripts\restore_database.ps1 -Force
+```
+
+Skripta prvo pravi bazu i uključuje PostGIS ako je potrebno, a zatim obnavlja projektne tabele. Odbija rad nad sistemskim bazama `postgres`, `template0` i `template1`.
+
+Za praznu početnu evidenciju bez sačuvanih geometrija i ML statusa umesto restore skripte može se pokrenuti:
 
 ```powershell
 python -m src.giscampus.sql.database
 ```
 
-Napraviti interaktivnu mapu za proveru zgrada:
+### 5. Preuzimanje rasterske podloge
+
+Raster je veliki lokalni fajl i nije u Git repozitorijumu. Ova komanda preuzima Esri World Imagery raster za definisani okvir kampusa:
 
 ```powershell
-python -m src.giscampus.geo.map
+python scripts/prepare_assets.py
 ```
 
-Mapa se zatim otvara iz `data/outputs/provera_zgrada.html`.
+Za ponovno pokretanje ML detekcije mogu se preuzeti i težine modela:
 
-Pokrenuti zavrsnu GIS aplikaciju:
+```powershell
+python scripts/prepare_assets.py --with-model
+```
+
+Model dolazi iz repozitorijuma [nilsho01/unet-resnet34-vhr-buildings](https://huggingface.co/nilsho01/unet-resnet34-vhr-buildings). Mali ručno nacrtani GeoJSON fajlovi čuvaju se u `data/processed/campus/`.
+
+### 6. Provera okruženja
+
+```powershell
+python scripts/check_setup.py
+```
+
+Provera prikazuje Python verziju, postojanje `.env` fajla, rastera, backupa i ML fajlova, PostGIS verziju i broj redova u svakoj tabeli. Nedostajući ML rasteri nisu prepreka za običan rad aplikacije ako su ML poligoni već obnovljeni iz baze.
+
+### 7. Pokretanje aplikacije
 
 ```powershell
 python -m streamlit run app.py
 ```
 
-Svih osam sportskih terena povezano je sa rucno proverenim OSM poligonima,
-a njihove povrsine i geometrije upisane su u PostGIS.
+Streamlit prikazuje lokalnu adresu, najčešće `http://localhost:8501`.
 
-U aplikaciji je omoguceno ukljucivanje i iskljucivanje svih prostornih slojeva,
-kao i promena njihove boje, providnosti i debljine ivice.
-Kontrole slojeva i simbologije nalaze se direktno na interaktivnoj mapi.
-U bocnoj traci dostupne su CRUD operacije nad svih sest projektnih tabela.
-Dodato je sedam prostornih analiza: clip zgrada u Severnoj zoni, intersection
-parkiralista i zelenila, njihova union operacija, difference kampusa i zgrada,
-buffer infrastrukture, within infrastrukture u Centralnoj zoni i overlaps
-parkinga i zgrada. Rezultat se prikazuje kao sloj i kao DataFrame.
+## Rezervna kopija posle izmena
 
-## Struktura
+Nakon promene podataka, geometrija ili ML statusa napraviti novu kopiju:
+
+```powershell
+.\scripts\backup_database.ps1 -Force
+```
+
+Skripta čuva samo sedam projektnih tabela u `data/backup/gis_kampus.backup`. Lozinka iz `.env` ne upisuje se u backup.
+
+## Ponovno pokretanje ML obrade
+
+Ovi koraci nisu potrebni za običan pregled obnovljene baze:
+
+```powershell
+python scripts/prepare_assets.py --with-model
+python -m src.giscampus.ml.detection
+python -m src.giscampus.ml.vectorization
+```
+
+Detekcija pravi raster verovatnoće, binarnu masku i PNG pregled. Vektorizacija pravi `ml_zgrade.geojson`. Upis se podrazumevano preskače ako ML tabela već ima redove, a ručno promenjeni statusi dodatno su zaštićeni od zamene.
+
+## Testovi
+
+```powershell
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+## Važne napomene
+
+- `restore_database.ps1 -Force` zamenjuje projektne tabele sadržajem backupa.
+- Backup treba osvežiti nakon važnih promena baze.
+- Geofabrik `latest` i URL modela sa granom `main` mogu kasnije dati novije podatke ili težine.
+- Aplikacija je lokalni studentski projekat, ne javni višekorisnički servis.
+- Za potpuno offline pokretanje unapred treba sačuvati raster, model i veb resurse mape.
+
+## Organizacija projekta
 
 ```text
 GisCampus/
-|-- app.py                         # Glavna aplikacija
-|-- requirements.txt              # Python biblioteke
-|-- src/giscampus/                 # Izvorni Python kod
-|   |-- sql/                       # Baza, CRUD i SQL upiti
-|   |-- geo/                       # Prostorni podaci, analize i mapa
-|   |   |-- data.py               # Ucitavanje i spajanje podataka
-|   |   |-- analysis.py           # Overlay i prostorni upiti
-|   |   `-- map.py                # Slojevi, simbologija i raster
-|   `-- ml.py                      # Masinsko ucenje
-|-- data/                          # Lokalni prostorni podaci i rezultati
-|-- docs/                          # Projektna dokumentacija
-|-- notebooks/                     # Zavrsna demonstraciona sveska
-|-- tests/                         # Automatske provere
-|-- .gitignore
-`-- README.md
+|-- app.py
+|-- requirements.txt
+|-- scripts/
+|   |-- backup_database.ps1
+|   |-- restore_database.ps1
+|   |-- check_setup.py
+|   `-- prepare_assets.py
+|-- src/giscampus/
+|   |-- sql/          # baza, CRUD i SQL upiti
+|   |-- geo/          # podaci, povezivanje, mapa i analize
+|   `-- ml/           # model, detekcija, prikaz i vektorizacija
+|-- data/
+|   |-- backup/       # kopija projektnih tabela
+|   |-- processed/    # mali ručno pripremljeni GeoJSON fajlovi
+|   |-- raw/          # veliki lokalni SHP i raster podaci
+|   `-- ml/           # težine i ML izlazi
+|-- docs/             # MD i PDF dokumentacija
+`-- tests/
 ```
