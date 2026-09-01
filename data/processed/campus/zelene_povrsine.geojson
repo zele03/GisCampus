@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "zelene_povrsine",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "zelena_povrsina_id": 1.0, "zona_id": 3.0, "zona": "Istocna", "tip": "park" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 19.852692, 45.248693 ], [ 19.852757, 45.248554 ], [ 19.852982, 45.248603 ], [ 19.853535, 45.247745 ], [ 19.853422, 45.247696 ], [ 19.853481, 45.247583 ], [ 19.854173, 45.247776 ], [ 19.854307, 45.247613 ], [ 19.854162, 45.247519 ], [ 19.854302, 45.247254 ], [ 19.854184, 45.247152 ], [ 19.854238, 45.247069 ], [ 19.854002, 45.246949 ], [ 19.854388, 45.246374 ], [ 19.854581, 45.246371 ], [ 19.854774, 45.246027 ], [ 19.854645, 45.245948 ], [ 19.855016, 45.245083 ], [ 19.855777, 45.249668 ], [ 19.852692, 45.248693 ] ] ] } },
+{ "type": "Feature", "properties": { "zelena_povrsina_id": 2.0, "zona_id": 1.0, "zona": "Severna", "tip": "livada" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 19.852094, 45.247674 ], [ 19.852249, 45.247457 ], [ 19.853019, 45.247681 ], [ 19.852858, 45.24791 ], [ 19.852094, 45.247674 ] ] ] } },
+{ "type": "Feature", "properties": { "zelena_povrsina_id": 3.0, "zona_id": 4.0, "zona": "Zapadna", "tip": "dvoriste 1" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 19.848073, 45.245596 ], [ 19.848186, 45.245404 ], [ 19.848449, 45.245494 ], [ 19.848342, 45.245676 ], [ 19.848073, 45.245596 ] ] ] } },
+{ "type": "Feature", "properties": { "zelena_povrsina_id": 4.0, "zona_id": 4.0, "zona": "Zapadna", "tip": "dvoriste 2" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 19.84905, 45.245287 ], [ 19.84927, 45.244886 ], [ 19.849683, 45.245011 ], [ 19.849425, 45.245415 ], [ 19.84905, 45.245287 ] ] ] } },
+{ "type": "Feature", "properties": { "zelena_povrsina_id": 5.0, "zona_id": 4.0, "zona": "Zapadna", "tip": "dvoriste 3" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 19.849683, 45.243608 ], [ 19.849259, 45.243495 ], [ 19.849543, 45.243041 ], [ 19.849975, 45.243155 ], [ 19.849683, 45.243608 ] ] ] } }
+]
+}

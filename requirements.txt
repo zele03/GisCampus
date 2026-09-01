@@ -1,21 +1,21 @@
 # Povezivanje sa PostgreSQL/PostGIS bazom
-psycopg2-binary
-python-dotenv
+psycopg2-binary==2.9.12
+python-dotenv==1.2.3
 
 # Ucitavanje podataka iz baze u DataFrame
-pandas
-SQLAlchemy
+pandas==3.0.5
+SQLAlchemy==2.0.52
 
 # Ucitavanje i obrada SHP prostornih podataka
-geopandas
-rasterio
+geopandas==1.1.4
+rasterio==1.5.1
 
 # Interaktivni prikaz prostornih slojeva
-folium
-streamlit
-streamlit-folium
+folium==0.20.0
+streamlit==1.62.0
+streamlit-folium==0.27.4
 
 # Masinsko ucenje za segmentaciju zgrada
-torch
-segmentation-models-pytorch
-Pillow
+torch==2.13.0
+segmentation-models-pytorch==0.5.0
+Pillow==12.3.0

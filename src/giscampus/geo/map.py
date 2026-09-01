@@ -22,7 +22,7 @@ PUTANJA_INTERAKTIVNE_MAPE = (
 )
 
 # OSM ID vrednosti povezuju red iz SQL tabele sa jednim ili vise SHP poligona.
-# Spisak je predlog koji se prvo proverava na mapi, pa se tek zatim upisuje u bazu.
+# Spisak je predlog koji je prvo proveraen na mapi, pa se tek zatim upisan u bazu.
 OSM_POLIGONI_ZGRADA = {
     "Tehnoloski fakultet": [222832767],
     "Poljoprivredni fakultet": [2956836],
@@ -78,7 +78,6 @@ BOJE_ZGRADA = [
     "#f781bf",
     "#1b9e77",
 ]
-
 
 def _ka_multipoligonu(geometrije: gpd.GeoSeries) -> MultiPolygon:
     """Spoji izabrane delove i rezultat uvek vrati kao MultiPolygon."""
